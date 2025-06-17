@@ -1,0 +1,22 @@
+project/
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── app/
+│   ├── main.py
+│   ├── model.py
+│   ├── utils.py
+│   ├── preprocess.py
+│   └── data/
+│       ├── X_train_update.csv
+│       ├── X_test_update.csv
+│       ├── Y_train_CVw08PX.csv
+│       └── images/
+│           ├── image_train/
+│           │   ├── 1.jpg
+│           │   ├── 2.jpg
+│           │   └── ...
+│           └── image_test/
+│               ├── 1.jpg
+│               ├── 2.jpg
+│               └── ...

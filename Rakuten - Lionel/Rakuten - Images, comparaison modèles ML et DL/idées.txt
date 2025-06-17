@@ -1,3 +1,0 @@
-# Extraction texte dans image
-Doctr
-Pytesseract

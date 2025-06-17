@@ -1,0 +1,34 @@
+services:
+  rakuten:
+    build: .
+    volumes:
+      - ./app/data:/workdir/app/data
+      - .:/workdir  # Pour sauvegarder les notebooks
+      - jupyter-data:/root/.jupyter  # Persistance des données Jupyter
+    ports:
+      - "8888:8888"  # Port pour Jupyter
+    # command: bash -c "nvidia-smi && jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+    command: bash -c "jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all  # Pour GPU
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, utility, compute]
+
+      
+    # command: >
+    #   bash -c "
+    #   echo 'Contenu de /workdir/app/data:' &&
+    #   ls -la /workdir/app/data &&
+    #   echo 'Contenu de /workdir:' &&
+    #   ls -la /workdir &&
+    #   jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+
+    
+volumes:
+  jupyter-data:  # Volume pour les données Jupyter
