@@ -23,10 +23,10 @@ def generate_splits(y, test_size=0.2, val_size=0.2, random_state=42):
     return indices
 
 
-def save_indices(indices_dict, path='../data/processed_data/indices_split.npz'):
+def save_indices(indices_dict, path='../data/processed/indices_split.npz'):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     np.savez(path, **indices_dict)
 
 
-def load_indices(path='../data/processed_data/indices_split.npz'):
+def load_indices(path='../data/processed/indices_split.npz'):
     return {k: v for k, v in np.load(path).items()}

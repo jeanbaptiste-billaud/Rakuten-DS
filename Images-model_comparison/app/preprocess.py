@@ -483,7 +483,7 @@ class ProductClassificationPipeline:
         """
         try:
             # Vérification des fichiers prétraités existants
-            features_dir = os.path.join(self.config.data_path, 'processed_data')
+            features_dir = os.path.join(self.config.data_path, 'processed')
             required_files = {
                 'X_train': os.path.join(features_dir, 'X_train.npz'),
                 'y_train': os.path.join(features_dir, 'y_train.npz'),
@@ -513,9 +513,9 @@ class ProductClassificationPipeline:
                     self.logger.warning(f"Les fichiers suivants sont manquants : {', '.join(missing_files)}")
                 
                 # a) Lecture des CSV
-                X_train_df = pd.read_csv('data/X_train_update.csv')
-                Y_train_df = pd.read_csv('data/Y_train_CVw08PX.csv')
-                X_test_df  = pd.read_csv('data/X_test_update.csv')   # Test challenge
+                X_train_df = pd.read_csv('data/X_train.csv')
+                Y_train_df = pd.read_csv('data/Y_train.csv')
+                X_test_df  = pd.read_csv('data/X_test.csv')   # Test challenge
                 
                 # b) Split (train / test_split) => 80/20 sur le jeu d'entraînement
                 X_train, X_test_split, y_train, y_test_split = train_test_split(
@@ -593,7 +593,7 @@ class ProductClassificationPipeline:
                 torch.save({
                     'state_dict': self.model.state_dict(),
                     'category_mapping': self.category_names,
-                    'config': self.model.config,
+                    'configs': self.model.config,
                 }, os.path.join(model_dir, 'model.pth'))
             else:
                 with open(os.path.join(model_dir, 'model.pkl'), 'wb') as f:
@@ -626,7 +626,7 @@ class ProductClassificationPipeline:
                     print("\nParamètres du modèle neural_net:")
                     print("=" * 50)
                     print("\nConfiguration:")
-                    for key, value in model_data['config'].items():
+                    for key, value in model_data['configs'].items():
                         print(f"{key}: {value}")
                     
                     print("\nArchitecture du modèle:")
@@ -635,7 +635,7 @@ class ProductClassificationPipeline:
                 # Recréation du modèle
                 self.model = NeuralClassifier(
                     num_classes=len(model_data['category_mapping']),
-                    config=model_data['config']
+                    config=model_data['configs']
                 ).to(self.device)
                 
                 self.model.load_state_dict(model_data['state_dict'])

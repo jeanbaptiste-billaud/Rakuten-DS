@@ -52,7 +52,7 @@ Ce dossier contient les différentes étapes de la pipeline MLOps, organisées e
 Pour enchaîner les étapes automatiquement, utiliser :
 
 ```bash
-python app/main_orchestrator.py --config config.yaml --stages stage01 stage02 stage03 stage04
+python app/main_orchestrator.py --configs configs.yaml --stages stage01 stage02 stage03 stage04
 ```
 
 Chaque étape peut être lancée indépendamment ou combinée.

@@ -8,8 +8,8 @@ import sys
 
 url = "https://drive.google.com/file/d/1guhuHp0dVRPWCtZ7570jEsTub6m2RrRF/view?usp=sharing"
 fichier_zip = "Preprocessed_data.zip"
-dossier_donnees_pretraitees = "data/processed_data"
-fichier_donnees_pretraitees = "data/processed_data/y_train.npz"
+dossier_donnees_pretraitees = "data/processed"
+fichier_donnees_pretraitees = "data/processed/y_train.npz"
 
 
 def load_model_configs():
@@ -20,7 +20,7 @@ def load_model_configs():
         dict: Configurations des modèles avec leurs paramètres
     """
     try:
-        config_path = os.path.join('data', 'models', 'model_configs.yaml')
+        config_path = os.path.join('data', 'models', 'train_image.yaml')
         with open(config_path, 'r', encoding='utf-8') as f:
             configs = yaml.safe_load(f)
         

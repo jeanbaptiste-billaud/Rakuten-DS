@@ -13,7 +13,7 @@ st.title("Classification Multimodale Rakuten - Démonstration")
 @st.cache_resource
 def load_pipeline():
     """Charge le pipeline et les modèles (mis en cache)"""
-    config = PipelineConfig.from_yaml('../config.yaml')
+    config = PipelineConfig.from_yaml('../configs.yaml')
     pipeline = ProductClassificationPipeline(config)
     pipeline.prepare_data(force_preprocess=False)
     

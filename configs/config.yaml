@@ -1,0 +1,46 @@
+# ======================
+# 🔧 Configuration globale de la pipeline
+# ======================
+
+# 📁 Chemins
+data:
+  raw_dir: data/raw/latest
+  processed_dir: data/processed/
+  interim_dir: data/interim/
+
+model:
+  checkpoint_dir: models/image/
+  pretrained_model_path: models/image/v3/model.pt
+
+training:
+  output_dir: outputs/
+  epochs: 20
+  batch_size: 32
+
+# ⚙️ Paramètres d'entraînement
+batch_size: 32
+target_size: 2000           # nombre max d’échantillons par classe après balancing
+random_state: 42
+num_workers: -1
+early_stopping_patience: 5
+
+# 🧠 Choix des modèles
+image_model_type: "xgboost"   # ou "mlp"
+text_model_type: "svm"
+
+# 🔄 Contrôle du pipeline
+force_preprocessing: True
+save_outputs: True
+
+# 🤝 Fusion multimodale
+fusion_strategy: "mean"       # options : mean, product, max, weighted, confidence_weighted
+
+# 🧪 Évaluation avancée
+crossval_folds: 5
+optuna_trials: 50
+
+# ======================
+# ⛔ Ne pas modifier ⛔
+# ======================
+
+version: 0 # latest doit toujours pointer vers ce numéro

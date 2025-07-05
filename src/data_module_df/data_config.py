@@ -37,14 +37,21 @@ class PipelineConfig:
         # Source de données prétraitées (Google Drive ZIP)
         self.preprocessed_drive_url = config_dict.get(
             'preprocessed_drive_url',
-            'https://drive.google.com/uc?id=1D7R4EpSc3NYpVsk_4UHQD3CoBLWyYoJe'
+            'https://drive.google.com/file/d/1guhuHp0dVRPWCtZ7570jEsTub6m2RrRF/view'
+            # 'https://drive.google.com/uc?id=1D7R4EpSc3NYpVsk_4UHQD3CoBLWyYoJe'
         )
 
     @classmethod
-    def from_yaml(cls, config_path):
-        with open(config_path, 'r') as f:
-            config_dict = yaml.safe_load(f)
-        return cls(config_dict)
+    def from_yaml(cls, path: str):
+        with open(path, 'r') as f:
+            cfg = yaml.safe_load(f)
+
+        config_dir = os.path.dirname(os.path.abspath(path))
+        for key in cfg:
+            if "path" in key or "dir" in key:
+                cfg[key] = os.path.abspath(os.path.join(config_dir, cfg[key]))
+
+        return cls(cfg)
 
     def to_dict(self):
         return self.__dict__
@@ -60,19 +67,18 @@ class PipelineConfig:
                 raise FileNotFoundError(f"Chemin introuvable : {path}")
 
     def ensure_preprocessed_data(self):
-        if not self.force_preprocessing:
-            expected = ['X_train.npz', 'X_val.npz', 'X_test.npz',
-                        'text_train.npz', 'text_val.npz', 'text_test.npz']
-            data_dir = os.path.join(self.data_path, 'processed_data')
-            missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
-            if missing:
-                print(f"⚠️ Données prétraitées manquantes : {missing}")
-                print("⬇️ Téléchargement depuis Google Drive en cours...")
-                download_and_extract_from_drive(self.preprocessed_drive_url, data_dir)
-                print("✅ Données prétraitées téléchargées.")
+        expected = ["X_test.npz", "X_test_split.npz", "X_train.npz", "test_split_indices.npz", "train_indices.npz", "y_test_split.npz",
+                    "y_train.npz"]
+        data_dir = os.path.join(self.data_path, 'processed')
+        missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
+        if missing:
+            print(f"⚠️ Données prétraitées manquantes : {missing}")
+            print("⬇️ Téléchargement depuis Google Drive en cours...")
+            download_and_extract_from_drive(self.preprocessed_drive_url, data_dir)
+            print("✅ Données prétraitées téléchargées.")
 
-                # Vérification post-téléchargement
-                still_missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
-                if still_missing:
-                    raise FileNotFoundError(f"❌ Les fichiers suivants sont toujours manquants après téléchargement : {still_missing}")
-                print("✅ Tous les fichiers nécessaires sont bien présents.")
+            # Vérification post-téléchargement
+            still_missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
+            if still_missing:
+                raise FileNotFoundError(f"❌ Les fichiers suivants sont toujours manquants après téléchargement : {still_missing}")
+            print("✅ Tous les fichiers nécessaires sont bien présents.")

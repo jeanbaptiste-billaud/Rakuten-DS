@@ -10,7 +10,7 @@ def prepare_text_data(config, force=False):
     et applique un équilibrage sur le jeu d'entraînement.
     """
     print("\n🔄 Préparation des données texte...")
-    X_df, y_df = load_training_data()
+    X_df, y_df = load_training_data(config.data_path)
     indices = load_indices()
 
     # Fusion du texte

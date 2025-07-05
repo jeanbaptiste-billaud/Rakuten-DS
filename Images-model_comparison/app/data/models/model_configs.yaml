@@ -1,4 +1,4 @@
-# model_configs.yaml
+# train_image.yaml
 xgboost:
   max_depth: 9
   learning_rate: 0.08

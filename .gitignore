@@ -1,5 +1,5 @@
 /Raw_data/
 **/.ipynb_checkpoints/**
 **/__pycache__/**
-**/images/**
+data/images/**
 *.npz

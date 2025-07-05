@@ -20,13 +20,13 @@ Rakuten-DS/
 ├── app/
 │   └── main_orchestrator.py        # Script principal de lancement pipeline
 │
-├── config.yaml                     # Fichier de configuration central
+├── configs.yaml                     # Fichier de configuration central
 │
 ├── pipeline_steps/                # Étapes de traitement modulaire
-│   ├── stage01_initialisation.py
-│   ├── stage02_eval_image.py
-│   ├── stage03_eval_text.py
-│   └── stage04_fusion_multimodale.py
+│   ├── initialisation.py
+│   ├── image_preprocessing.py
+│   ├── text_preprocessing.py
+│   └── fusion_multimodale.py
 │
 ├── src/
 │   ├── data_module_def/           # Scripts de chargement, preprocessing, balancing...
@@ -53,7 +53,7 @@ Rakuten-DS/
 ## ▶️ Lancement du pipeline
 
 ```bash
-python app/main_orchestrator.py --config config.yaml --stages stage01 stage02 stage03 stage04
+python app/main_orchestrator.py --configs configs.yaml --stages stage01 stage02 stage03 stage04
 ```
 
 Tu peux également exécuter un sous-ensemble des étapes, par exemple :

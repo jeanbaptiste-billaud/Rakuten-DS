@@ -12,7 +12,7 @@ def load_model_configs():
         dict: Configurations des modèles avec leurs paramètres
     """
     try:
-        config_path = os.path.join('../../data', 'models', 'model_configs.yaml')
+        config_path = os.path.join('../../data', 'models', 'train_image.yaml')
         with open(config_path, 'r', encoding='utf-8') as f:
             configs = yaml.safe_load(f)
 

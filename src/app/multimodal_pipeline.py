@@ -2,7 +2,7 @@
 import os
 
 from src.data_module_df.data_fusion_manager import FusionManager
-from src.data_module_df.data_image import (prepare_image_data)
+from src.data_module_df.data_image import prepare_image_data
 from src.data_module_df.data_text import prepare_text_data
 from src.models_module_df.model_image_classifier import ImageClassifierManager
 from src.models_module_df.model_text_classifier import TextClassifier

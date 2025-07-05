@@ -1,47 +1,88 @@
 # data_image.py
-from src.data_module_df.data_balancing import undersample, print_class_distribution
-from src.data_module_df.data_indexing import load_indices
-from src.data_module_df.data_loader import load_training_data, save_processed_npz
-from src.models_module_df.model_feature_extractor import FeatureExtractor
+import os
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from torchvision.models import resnet50, ResNet50_Weights
+import torchvision.transforms as transforms
+from PIL import Image
+from tqdm import tqdm
 
 
-def prepare_image_data(config, force=False):
-    """
-    Prépare les features image (X) et labels (y) à partir des chemins image et indices stratifiés.
-    """
-    print("\n🔄 Préparation des données image...")
-    X_df, y_df = load_training_data()
-    indices = load_indices()
-    y = y_df['prdtypecode'].values
+class RakutenImageDataset(Dataset):
+    def __init__(self, image_paths, labels=None, transform=None):
+        self.image_paths = image_paths
+        self.labels = labels
+        self.transform = transform if transform else transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        ])
 
-    image_paths = X_df['image_path'].values
-    y_all = y
+    def __len__(self):
+        return len(self.image_paths)
 
-    # train
-    X_train_paths = image_paths[indices['train_idx']]
-    y_train = y_all[indices['train_idx']]
-    print_class_distribution(y_train, "Avant équilibrage (train)")
-    X_train_paths, y_train = undersample(X_train_paths, y_train, max_per_class=1000)
-    print_class_distribution(y_train, "Après équilibrage (train)")
+    def __getitem__(self, idx):
+        image = Image.open(self.image_paths[idx]).convert('RGB')
+        image = self.transform(image)
+        if self.labels is not None:
+            return image, self.labels[idx]
+        return image
 
-    # val
-    X_val_paths = image_paths[indices['val_idx']]
-    y_val = y_all[indices['val_idx']]
 
-    # test
-    X_test_paths = image_paths[indices['test_idx']]
-    y_test = y_all[indices['test_idx']]
+def create_image_dataset(df, image_dir, labels=None):
+    image_paths = []
+    images_not_found = 0
 
-    # Feature extraction
-    extractor = FeatureExtractor()
-    X_train = extractor.extract_from_image_paths(X_train_paths)
-    X_val = extractor.extract_from_image_paths(X_val_paths)
-    X_test = extractor.extract_from_image_paths(X_test_paths)
+    for _, row in df.iterrows():
+        image_file = f"image_{row['imageid']}_product_{row['productid']}.jpg"
+        image_path = os.path.join(image_dir, image_file)
+        if os.path.exists(image_path):
+            image_paths.append(image_path)
+        else:
+            images_not_found += 1
 
-    # Save
-    save_processed_npz({'features': X_train, 'labels': y_train}, 'X_train')
-    save_processed_npz({'features': X_val, 'labels': y_val}, 'X_val')
-    save_processed_npz({'features': X_test, 'labels': y_test}, 'X_test')
+    if not image_paths:
+        raise FileNotFoundError("Aucune image valide trouvée dans le dossier spécifié.")
 
-    print("✅ Données image prêtes : features extraites et sauvegardées.")
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    return RakutenImageDataset(image_paths, labels)
+
+
+def extract_resnet_features(dataset, device, batch_size=128, num_workers=4, desc="Extraction features"):
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        prefetch_factor=2,
+        persistent_workers=True
+    )
+
+    resnet = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+    resnet.fc = nn.Identity()
+    resnet = resnet.to(device)
+    resnet.eval()
+
+    features = []
+    labels = []
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc=desc):
+            if isinstance(batch, (list, tuple)) and len(batch) == 2:
+                inputs, batch_labels = batch
+                labels.extend(batch_labels.numpy())
+            else:
+                inputs = batch
+
+            inputs = inputs.to(device)
+            batch_features = resnet(inputs)
+            features.append(batch_features.cpu().numpy())
+
+    return {
+        'features': np.vstack(features),
+        'labels': np.array(labels) if labels else None
+    }
+
