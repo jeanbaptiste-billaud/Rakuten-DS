@@ -19,7 +19,7 @@ def main(config_path):
 
         print("✂️ Génération des splits stratifiés...")
         indices = generate_splits(y, test_size=0.2, val_size=0.2, random_state=config.random_state)
-        save_indices(indices)
+        save_indices(indices, )
 
         print("🧼 Prétraitement des images...")
         prepare_image_data(config)

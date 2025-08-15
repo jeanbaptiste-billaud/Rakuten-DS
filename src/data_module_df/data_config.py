@@ -1,84 +1,126 @@
 # data_config.py
 import os
-import yaml
-from src.common_utils import download_and_extract_from_drive
+import subprocess
+from pathlib import Path
+
+from omegaconf import OmegaConf
+
 
 class PipelineConfig:
-    def __init__(self, config_dict):
-        # Chemins
-        self.data_path = config_dict.get('data_path', '../data')
-        self.image_dir = config_dict.get('image_dir', '../data/images')
-        self.model_path = config_dict.get('model_path', '../data/models')
-        self.output_dir = config_dict.get('output_dir', '../data/reports')
-        self.plot_dir = config_dict.get('plot_dir', '../data/plots')
+    def __init__(self):
+        # 1. Localisation du projet et du YAML
+        this_file = Path(__file__).resolve()
+        self.project_root = this_file.parents[2]
+        self.config_path = self.project_root / "configs" / "config.yaml"
 
-        # Paramètres entraînement
-        self.batch_size = config_dict.get('batch_size', 32)
-        self.target_size = config_dict.get('target_size', 2000)
-        self.random_state = config_dict.get('random_state', 42)
-        self.num_workers = config_dict.get('num_workers', -1)
-        self.early_stopping_patience = config_dict.get('early_stopping_patience', 5)
+        # 2. Chargement YAML
+        self.yaml_cfg = OmegaConf.load(self.config_path)
 
-        # Choix des modèles
-        self.image_model_type = config_dict.get('image_model_type', 'xgboost')
-        self.text_model_type = config_dict.get('text_model_type', 'svm')
+        # 3. Attributs simples (hors blocs imbriqués)
+        for key, value in self.yaml_cfg.items():
+            if key not in ["data", "image_model", "text_model", "output", "multithreading"]:
+                setattr(self, key, value)
 
-        # Contrôle du pipeline
-        self.force_preprocessing = config_dict.get('force_preprocessing', False)
-        self.save_outputs = config_dict.get('save_outputs', True)
+        # 4. Flags d'entraînement
+        self.train_image = self.yaml_cfg["image_model"].get('image_force_training', False)
+        self.train_text = self.yaml_cfg["text_model"].get('text_force_training', False)
 
-        # Fusion multimodale
-        self.fusion_strategy = config_dict.get('fusion_strategy', 'mean')
+        # 5. Process tous les chemins
+        self.process_paths()
+        self.image_dir = self.raw_dir / "images"
 
-        # Évaluation avancée
-        self.crossval_folds = config_dict.get('crossval_folds', 5)
-        self.optuna_trials = config_dict.get('optuna_trials', 50)
+        # 6. Multithrading setup
+        self.num_workers = 1
+        self.multithreading()
 
-        # Source de données prétraitées (Google Drive ZIP)
-        self.preprocessed_drive_url = config_dict.get(
-            'preprocessed_drive_url',
-            'https://drive.google.com/file/d/1guhuHp0dVRPWCtZ7570jEsTub6m2RrRF/view'
-            # 'https://drive.google.com/uc?id=1D7R4EpSc3NYpVsk_4UHQD3CoBLWyYoJe'
-        )
 
-    @classmethod
-    def from_yaml(cls, path: str):
-        with open(path, 'r') as f:
-            cfg = yaml.safe_load(f)
+    def process_paths(self):
+        """Construit tous les chemins utiles et crée les dossiers si nécessaire."""
 
-        config_dir = os.path.dirname(os.path.abspath(path))
-        for key in cfg:
-            if "path" in key or "dir" in key:
-                cfg[key] = os.path.abspath(os.path.join(config_dir, cfg[key]))
+        # -- DATA PATHS --
+        data_cfg = self.yaml_cfg.get('data', {})
 
-        return cls(cfg)
+        for key, rel_path in data_cfg.items():
+            path = self.project_root / rel_path
+            setattr(self, key, path)
+
+        # versionnée ou latest
+        if self.force_preprocessing:
+            self.processed_dir = self.processed_dir / f"v{self.version}"
+        else:
+            self.processed_dir = self.processed_dir / "latest"
+
+        self.processed_dir.mkdir(parents=True, exist_ok=True)
+
+        # -- MODEL PATHS --
+        image_model_cfg = self.yaml_cfg.get("image_model", {})
+        text_model_cfg = self.yaml_cfg.get("text_model", {})
+
+        if self.train_image:
+            self.image_model_path = self.project_root / image_model_cfg["image_model_path"]
+        else:
+            self.image_model_path = self.project_root / image_model_cfg["image_model_path"] / f"v{self.version}"
+
+        if self.train_text:
+            self.text_model_path = self.project_root / text_model_cfg["text_model_path"]
+        else:
+            self.text_model_path = self.project_root / text_model_cfg["text_model_path"] / f"v{self.version}"
+
+        self.image_model_path.mkdir(parents=True, exist_ok=True)
+        self.text_model_path.mkdir(parents=True, exist_ok=True)
+
+    def multithreading(self):
+        config = self.yaml_cfg.get("multithreading", {})
+
+        if config["activate"]:
+            if config["auto"]:
+                self.num_workers = min(16, os.cpu_count()//2)
+            else:
+                self.num_workers = config["num_workers"]
+
 
     def to_dict(self):
         return self.__dict__
 
     def save_yaml(self, output_path):
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w') as f:
-            yaml.dump(self.to_dict(), f)
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open('w') as f:
+            self.yaml.dump(self.to_dict(), f)
+
+    def update_and_save_config(self):
+        self.yaml_cfg["version"] += 1
+        self.save_yaml(self.config_path)
 
     def validate_paths(self):
         for path in [self.data_path, self.image_dir, self.model_path]:
-            if not os.path.exists(path):
+            if not path.exists():
                 raise FileNotFoundError(f"Chemin introuvable : {path}")
 
     def ensure_preprocessed_data(self):
-        expected = ["X_test.npz", "X_test_split.npz", "X_train.npz", "test_split_indices.npz", "train_indices.npz", "y_test_split.npz",
-                    "y_train.npz"]
-        data_dir = os.path.join(self.data_path, 'processed')
-        missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
+        expected = [
+            "X_test.npz", "X_test_split.npz", "X_train.npz",
+            "test_split_indices.npz", "train_indices.npz",
+            "y_test_split.npz", "y_train.npz"
+        ]
+        data_dir = self.processed_dir
+        missing = [f for f in expected if not (data_dir / f).exists()]
+
         if missing:
             print(f"⚠️ Données prétraitées manquantes : {missing}")
-            print("⬇️ Téléchargement depuis Google Drive en cours...")
-            download_and_extract_from_drive(self.preprocessed_drive_url, data_dir)
-            print("✅ Données prétraitées téléchargées.")
+            print("⬇️ Récupération via DVC…")
 
-            # Vérification post-téléchargement
-            still_missing = [f for f in expected if not os.path.exists(os.path.join(data_dir, f))]
+            try:
+                subprocess.run(["dvc", "pull"], cwd=self.project_root, check=True, capture_output=True, text=True)
+                print("✅ DVC pull terminé avec succès.")
+            except subprocess.CalledProcessError as e:
+                print("❌ Échec de DVC pull.")
+                print("📄 Stdout:", e.stdout)
+                print("📄 Stderr:", e.stderr)
+                raise RuntimeError("Erreur lors de l'exécution de 'dvc pull'")
+
+            # Re-vérification
+            still_missing = [f for f in expected if not (data_dir / f).exists()]
             if still_missing:
-                raise FileNotFoundError(f"❌ Les fichiers suivants sont toujours manquants après téléchargement : {still_missing}")
+                raise FileNotFoundError(f"❌ Les fichiers suivants sont toujours manquants après 'dvc pull' : {still_missing}")
             print("✅ Tous les fichiers nécessaires sont bien présents.")

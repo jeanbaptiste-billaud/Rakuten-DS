@@ -2,7 +2,7 @@
 import argparse
 from src.data_module_df.data_config import PipelineConfig
 from src.pipeline_steps_df.initialisation import main as run_stage01
-from src.pipeline_steps_df.image_preprocessing import StageImagePipeline
+from src.pipeline_steps_df.preprocessing import StageImagePipeline
 from src.pipeline_steps_df.text_preprocessing import StageTextPipeline
 from src.pipeline_steps_df.fusion_multimodale import StageFusionPipeline
 

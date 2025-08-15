@@ -1,5 +1,6 @@
 # data_indexing.py
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import StratifiedShuffleSplit
 import os
 
@@ -23,10 +24,11 @@ def generate_splits(y, test_size=0.2, val_size=0.2, random_state=42):
     return indices
 
 
-def save_indices(indices_dict, path='../data/processed/indices_split.npz'):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    np.savez(path, **indices_dict)
+def save_indices(indices_dict, file_name):
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
+    np.savez(file_name, **indices_dict)
 
 
-def load_indices(path='../data/processed/indices_split.npz'):
-    return {k: v for k, v in np.load(path).items()}
+def load_indices(file_name):
+    indices_dict = {k: v for k, v in np.load(file_name).items()}
+    return  indices_dict

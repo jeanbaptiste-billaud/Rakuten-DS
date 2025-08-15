@@ -24,7 +24,7 @@ Rakuten-DS/
 │
 ├── pipeline_steps/                # Étapes de traitement modulaire
 │   ├── initialisation.py
-│   ├── image_preprocessing.py
+│   ├── preprocessing.py
 │   ├── text_preprocessing.py
 │   └── fusion_multimodale.py
 │

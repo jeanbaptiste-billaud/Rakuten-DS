@@ -1,5 +1,5 @@
 [core]
     autostage = true
+    remote = origin
 ['remote "origin"']
-    url = s3://dvc
-    endpointurl = https://dagshub.com/jeanbaptiste-billaud/Rakuten-DS.s3
+    url = https://dagshub.com/jeanbaptiste-billaud/Rakuten-DS.dvc

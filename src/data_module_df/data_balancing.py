@@ -30,7 +30,7 @@ def print_class_distribution(y, title="Répartition des classes"):
         print(f"  Classe {label}: {count} échantillons")
 
 
-def create_balanced_dataset(config: dict, raw_csv_df):
+def create_balanced_dataset(config, raw_csv_df):
     """
     Crée un dataset équilibré en considérant à la fois la distribution des classes
     et la taille des fichiers images.
@@ -46,7 +46,7 @@ def create_balanced_dataset(config: dict, raw_csv_df):
     # Collecte des informations sur les fichiers
     for _, row in raw_csv_df.iterrows():
         image_file = f"image_{row['imageid']}_product_{row['productid']}.jpg"
-        file_path = os.path.join(config["train_image_dir"], image_file)
+        file_path = os.path.join(config.image_dir, image_file)
 
         if os.path.exists(file_path):
             size_kb = os.path.getsize(file_path) / 1024
@@ -69,11 +69,11 @@ def create_balanced_dataset(config: dict, raw_csv_df):
         class_data = df_analysis[df_analysis['prdtypecode'] == classe].copy()
         n_samples = len(class_data)
 
-        if n_samples > config["target_size"]:
+        if n_samples > config.training.target_size:
             # Sous-échantillonnage stratifié par taille
             size_bins = pd.qcut(class_data['size_kb'], q=5, labels=False)
             class_data['size_bin'] = size_bins
-            samples_per_bin = config["target_size"] // 5
+            samples_per_bin = config.training.target_size // 5
 
             stratified_sample = []
             for bin_id in range(5):
@@ -81,16 +81,16 @@ def create_balanced_dataset(config: dict, raw_csv_df):
                 if len(bin_data) > 0:
                     selected = bin_data.sample(
                         n=min(len(bin_data), samples_per_bin),
-                        random_state=config["random_state"]
+                        random_state=config.training.random_state
                     ).index.tolist()
                     stratified_sample.extend(selected)
 
             # Si on n'a pas assez d'échantillons après stratification
-            remaining = config["target_size"] - len(stratified_sample)
+            remaining = config.training.target_size - len(stratified_sample)
             if remaining > 0:
                 additional = class_data[~class_data.index.isin(stratified_sample)].sample(
                     n=min(remaining, len(class_data) - len(stratified_sample)),
-                    random_state=config["random_state"]
+                    random_state=config.training.random_state
                 ).index.tolist()
                 stratified_sample.extend(additional)
 
@@ -103,7 +103,7 @@ def create_balanced_dataset(config: dict, raw_csv_df):
 
             if n_samples > 0:
                 # Calcul du nombre d'échantillons supplémentaires nécessaires
-                n_needed = config["target_size"] - n_samples
+                n_needed = config.training.target_size - n_samples
 
                 # Division en bins de taille
                 size_bins = pd.qcut(class_data['size_kb'], q=min(5, n_samples), labels=False)
