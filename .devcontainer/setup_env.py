@@ -115,7 +115,7 @@ def install_pytorch():
 def main():
     print("🚀 Installation du projet Rakuten...")
 
-    check_python_version()
+    # check_python_version()
 
     print("📦 Mise à jour de pip...")
     run(f"{sys.executable} -m pip install --upgrade pip setuptools wheel")
