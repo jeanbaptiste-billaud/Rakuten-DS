@@ -4,16 +4,6 @@ import platform
 import re
 import os
 
-PYTHON_REQUIRED = "3.12"
-
-
-def check_python_version():
-    version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    if not version.startswith(PYTHON_REQUIRED):
-        print(f"❌ Erreur: Python {PYTHON_REQUIRED}.x requis, version détectée: {version}")
-        sys.exit(1)
-    print(f"✅ Python {version} détecté")
-
 
 def run(cmd):
     print(f"🔧 {cmd}")
@@ -115,9 +105,8 @@ def install_pytorch():
 def main():
     print("🚀 Installation du projet Rakuten...")
 
-    # check_python_version()
-
     print("📦 Mise à jour de pip...")
+    run("pip install --upgrade pip")
     run(f"{sys.executable} -m pip install --upgrade pip setuptools wheel")
 
     install_pytorch()
