@@ -9,7 +9,7 @@
 
 #### Le script s'adapte automatiquement à l'environnement 
 ```bash
-python install.py
+python setup_env.py
 ```
 
 ## Installation manuelle

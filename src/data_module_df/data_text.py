@@ -1,11 +1,6 @@
 # data_text.py
-import langid
-import pandas as pd
-import swifter
 import spacy
-from deep_translator import GoogleTranslator
 from spacy.cli import download
-from tqdm import tqdm
 
 # Chargement du modèle spaCy français
 try:
@@ -13,33 +8,6 @@ try:
 except OSError:
     print("📦 Modèle spaCy 'fr_core_news_sm' manquant. Téléchargement en cours...")
     download("fr_core_news_sm")
-
-
-def truncate_text(text, max_length=2000, threshold=5000):
-    if isinstance(text, str) and len(text) > threshold:
-        return text[:max_length]
-    return text
-
-
-def detect_language(text):
-    try:
-        return langid.classify(text)[0]
-    except:
-        return "unknown"
-
-
-def translate_texts_to_french(texts, batch_size=50):
-    translated = []
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i+batch_size]
-        try:
-            translated.extend(
-                GoogleTranslator(source="auto", target='fr').translate_batch(batch)
-            )
-        except Exception as e:
-            print(f"⚠️ Erreur batch {i}-{i+batch_size} : {e}")
-            translated.extend(batch)  # fallback : texte inchangé
-    return translated
 
 
 def preprocess_text_fr(text):
@@ -72,29 +40,6 @@ def batch_preprocess_text_fr(texts, batch_size=50, n_process=-1):
 
 def prepare_text_column(df, cfg, input_col="designation_description"):
     data = df.copy()
-
-    # Étape 1 : troncature
-    # data.loc[:, input_col] = data.loc[:, input_col].swifter.apply(truncate_text)
-
-    # # Étape 2 : détection et traduction
-    # data["language"] = data.loc[:, input_col].swifter.apply(detect_language)
-    #
-    # # Étape 3 : initialisation de la colonne traduite
-    # data["text_fr"] = data[input_col]
-    #
-    # # Étape 4 : traitement par groupe de langue ≠ 'fr'
-    # print("\n🌍 Traduction vers le français par langue :")
-    # for lang, group_df in tqdm(data.groupby("language"), desc="🗣️ Langues détectées"):
-    #     if lang == "fr":
-    #         continue
-    #
-    #     to_translate = group_df[input_col].fillna("").tolist()
-    #     translated = translate_texts_to_french(
-    #         texts=to_translate,
-    #         batch_size=cfg.training.batch_size
-    #     )
-    #
-    #     data.loc[group_df.index, "text_fr"] = translated
 
     # Étape 5 : NLP avec spaCy français
     cleaned = []

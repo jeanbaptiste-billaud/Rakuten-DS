@@ -4,7 +4,7 @@ import platform
 import re
 import os
 
-PYTHON_REQUIRED = "3.11"
+PYTHON_REQUIRED = "3.12"
 
 
 def check_python_version():
@@ -123,7 +123,7 @@ def main():
     install_pytorch()
 
     print("📚 Installation des dépendances...")
-    run("pip install -r requirements.txt")
+    run("pip install -r .devcontainer/requirements.txt")
 
     print("🔧 Configuration du kernel Jupyter...")
     run("pip install ipykernel")
