@@ -1,5 +1,4 @@
 [core]
     autostage = true
-    remote = origin
 ['remote "origin"']
     url = https://dagshub.com/jeanbaptiste-billaud/Rakuten-DS.dvc
