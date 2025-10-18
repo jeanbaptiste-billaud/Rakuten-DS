@@ -12,14 +12,14 @@
   // "forwardPorts": [],
 
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "python .devcontainer/setup_env.py ; pip install dvc[all]",
+  "postCreateCommand": "pip install -r .devcontainer/requirements.txt ; pip install dvc[all]",
 
   // Configure tool-specific properties.
   "customizations" : {
     "jetbrains" : {
       "backend" : "PyCharm"
     }
-  },
+  }
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
