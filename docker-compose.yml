@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/api-gateway/Dockerfile
+    container_name: rakuten-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PREPROCESSING_SERVICE_URL=http://preprocessing:8001
+      - MODEL_SERVICE_URL=http://model:8002
+    depends_on:
+      - preprocessing
+      - model
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rakuten-network
+    restart: unless-stopped
+
+  preprocessing:
+    build:
+      context: .
+      dockerfile: docker/preprocessing/Dockerfile
+    container_name: rakuten-preprocessing
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rakuten-network
+    restart: unless-stopped
+
+  model:
+    build:
+      context: .
+      dockerfile: docker/model/Dockerfile
+    container_name: rakuten-model
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+    networks:
+      - rakuten-network
+    restart: unless-stopped
+
+networks:
+  rakuten-network:
+    driver: bridge
+
+volumes:
+  logs:
