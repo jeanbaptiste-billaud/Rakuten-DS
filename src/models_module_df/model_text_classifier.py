@@ -1,40 +1,42 @@
 # model_text_classifier.py
-import os
-import joblib
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, classification_report
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import accuracy_score, f1_score
+
 
 class TextClassifier:
-    def __init__(self, model_path):
-        self.model_path = model_path
-        self.model = None
+    def __init__(self, model=None):
 
-    def train(self, X_text, y):
-        pipeline = Pipeline([
-            ('tfidf', TfidfVectorizer(max_features=45000)),
-            ('svm', SVC(C=12, kernel='rbf', gamma='scale', probability=True, class_weight='balanced'))
-        ])
-        pipeline.fit(X_text, y)
-        self.model = pipeline
+        if model is None:
+            pipeline = Pipeline([
+                ('tfidf', TfidfVectorizer(max_features=45000)),
+                ('svm', SVC(C=12, kernel='rbf', gamma='scale', probability=True, class_weight='balanced'))
+            ])
 
-    def predict(self, X_text):
-        preds = self.model.predict(X_text)
-        probs = self.model.predict_proba(X_text)
+            self.model = pipeline
+        else:
+            self.model = model
+
+    def train(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
+
+    def predict(self, X):
+        preds = self.model.predict(X)
+        probs = self.model.predict_proba(X)
         return preds, probs
 
-    def evaluate(self, y_true, preds, probs):
-        return {
+    def evaluate(self, X_test, y_true ):
+        preds, probs = self.predict(X_test)
+
+        metrics =  {
             'accuracy': round(accuracy_score(y_true, preds), 4),
             'weighted_f1': round(f1_score(y_true, preds, average='weighted'), 4),
             'macro_f1': round(f1_score(y_true, preds, average='macro'), 4),
             'mean_confidence': round(probs.max(axis=1).mean(), 4)
         }
 
-    def save(self):
-        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
-        joblib.dump(self.model, self.model_path)
+        cm = confusion_matrix(y_true, preds).tolist()
+        cr = classification_report(y_true, preds, output_dict=True)
 
-    def load(self):
-        self.model = joblib.load(self.model_path)
+        return metrics, cm, cr

@@ -1,20 +1,22 @@
 # train_text_model_mlflow.py
-import os
 import json
-import pandas as pd
-import mlflow
+import os
+
+import bentoml
 import mlflow.sklearn
+import pandas as pd
+from bentoml.types import ModelSignature
 from sklearn.model_selection import train_test_split
-from src.models_module_df.model_text_classifier import TextClassifier
+
 from src.common_utils import get_project_root
+from src.models_module_df.model_text_classifier import TextClassifier
 
 # --- Configuration ---
 ROOT_PATH = get_project_root()
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
+
 OUTPUT_DIR = os.path.join(ROOT_PATH, "models/text_classifier")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-MODEL_PATH = os.path.join(OUTPUT_DIR, "text_model.joblib")
 METRICS_PATH = os.path.join(OUTPUT_DIR, "metrics_text.json")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
@@ -40,12 +42,28 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
 
     # --- Entraînement ---
     print("🚀 Entraînement du modèle de classification textuelle...")
-    classifier = TextClassifier(MODEL_PATH)
+    classifier = TextClassifier()
     classifier.train(X_train, y_train)
 
-    # --- Prédictions ---
-    preds, probs = classifier.predict(X_val)
-    metrics = classifier.evaluate(y_val, preds, probs)
+    # --- Evaluation ---
+    metrics, cm, cr = classifier.evaluate(X_val, y_val)
+
+    # --- Sauvegarde du modèle avec BentoML ---
+    bento_model = bentoml.sklearn.save_model(
+        "text_classifier_svm",
+        classifier.model,
+        signatures={
+            "predict": ModelSignature(),
+            "predict_proba": ModelSignature(),
+        },
+        metadata={
+            "framework": "scikit-learn",
+            "source": "MLflow-tracked",
+            "accuracy": metrics["accuracy"],
+            "macro_f1": metrics["macro_f1"]
+        }
+    )
+    print(f"📦 Modèle enregistré dans BentoML : {bento_model.tag}")
 
     # --- Log des paramètres dans MLflow ---
     mlflow.log_params({
@@ -61,20 +79,18 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     })
 
     # --- Log des métriques ---
-    mlflow.log_metrics(metrics)
+    mlflow.log_metrics(metrics)  # attends un dictionnaire
 
-    # --- Sauvegarde locale du modèle ---
-    classifier.save()
+    # --- Sauvegarde des résultats d'évaluation et enregistrement de l'emplacement du fichier dans mlflow ---
+    metrics["confusion_matrix"] = cm
+    metrics["classification_report"] = cr
     with open(METRICS_PATH, "w") as f:
         json.dump(metrics, f, indent=2)
 
-    # --- Log artefacts ---
-    mlflow.log_artifact(MODEL_PATH, artifact_path="model")
-    mlflow.log_artifact(METRICS_PATH, artifact_path="metrics")
+    mlflow.log_artifact(METRICS_PATH, artifact_path="metrics")  # attends fichiers (JSON, CSV, image, modèle)
 
-    # --- Sauvegarde du modèle dans MLflow ---
-    mlflow.sklearn.log_model(classifier.model, artifact_path="model_sklearn")
+    # --- le tag du modèle Bento est enregistré dans mlflow
+    mlflow.log_text(str(bento_model.tag), "bentoml_model_tag.txt")
 
-    print(f"✅ Modèle sauvegardé dans {MODEL_PATH}")
     print(f"📊 Métriques : {metrics}")
     print(f"🔗 MLflow Run ID : {run.info.run_id}")

@@ -10,5 +10,5 @@ Requests
 scikit_learn
 spacy
 tqdm
-mlflow
+mlflow==3.5.0
 bentoml
