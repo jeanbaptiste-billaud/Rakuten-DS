@@ -1,7 +1,4 @@
-# train_text_model_mlflow.py
-
-# todo: finaliser sauvegarde du modèle avec mlflow, bucket ?
-# todo: vérifier la connexion au serveur mlflow et la sauvegarde des artefacts
+# local_mlflow_training.py
 import json
 import os
 import mlflow
@@ -16,7 +13,8 @@ from src.models_module_df.model_text_classifier import TextClassifier
 ROOT_PATH = get_project_root()
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
 
-MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
+mlflow.set_experiment("text_classification_svm")
 
 # --- Initialisation MLflow ---
 mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
@@ -27,8 +25,6 @@ else:
     mlflow_uri = "http://localhost:5000"
     print(f"[INFO] MLFLOW_TRACKING_URI not set — using default: {mlflow_uri}")
     mlflow.set_tracking_uri(mlflow_uri)
-
-mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
 with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     run_id = run.info.run_id

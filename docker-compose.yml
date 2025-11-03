@@ -4,7 +4,7 @@ services:
   api-gateway:
     build:
       context: .
-      dockerfile: docker/api-gateway/Dockerfile
+      dockerfile: dockerfiles/api-gateway/Dockerfile
     container_name: rakuten-api-gateway
     ports:
       - "8000:8000"
@@ -23,7 +23,7 @@ services:
   preprocessing:
     build:
       context: .
-      dockerfile: docker/preprocessing/Dockerfile
+      dockerfile: dockerfiles/preprocessing/Dockerfile
     container_name: rakuten-preprocessing
     ports:
       - "8001:8001"
@@ -36,7 +36,7 @@ services:
   model:
     build:
       context: .
-      dockerfile: docker/model/Dockerfile
+      dockerfile: dockerfiles/model/Dockerfile
     container_name: rakuten-model
     ports:
       - "8002:8002"
@@ -47,10 +47,6 @@ services:
       - rakuten-network
     restart: unless-stopped
 
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v3.5.0
-    ports:
-      - "5000:5000"
 
 networks:
   rakuten-network:
@@ -58,3 +54,5 @@ networks:
 
 volumes:
   logs:
+
+#todo: à fusionner avec celui du dossier docker-compose

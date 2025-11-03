@@ -22,7 +22,7 @@ fi
 #touch mlflow/mlflow.db
 
 echo "🚀 Lancement du serveur MLflow..."
-docker run  --mount type=bind,src=$(pwd)/mlflow,dst=/mlflow,bind-propagation=shared -d \
+docker run  --mount type=bind,src=$(pwd)/mlflow,dst=/mlflow -d \
   --name "$CONTAINER_NAME" \
   -p 5000:5000 \
   -e MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db \

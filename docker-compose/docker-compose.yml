@@ -1,0 +1,147 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: mlflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ../data/pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:${MINIO_VERSION}
+    container_name: minio-S3-storage
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ../data/minio-data:/data
+      - ../data:/mnt/data
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_PORT}/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  create-buckets:
+    image: minio/mc:${MC_VERSION}
+    container_name: bucket-creator
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c '
+      mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} \
+        ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing myminio/${MINIO_MLFLOW_BUCKET:-mlflow} &&
+      mc mb myminio/raw &&
+      mc mb myminio/dataset &&
+      mc mb myminio/preprocessed &&
+      mc cp /mnt/data/raw/all_raw_data.csv myminio/raw/all_raw_data.csv &&
+      mc mirror --overwrite  /mnt/data/dataset myminio/dataset &&
+      mc mirror --overwrite  /mnt/data/preprocessed myminio/preprocessed
+      '
+    restart: "no"
+
+  mc-pull:
+    image: minio/mc:${MC_VERSION}
+    container_name: mc-pull
+    volumes:
+      - ../data:/mnt/data
+      - ../src/services:/scripts
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/pull_from_minio.sh"]
+
+  # =========================================================
+  # 🧠 MLflow Tracking Server (UI + REST API)
+  # =========================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:${MLFLOW_VERSION}
+    container_name: mlflow
+    depends_on:
+      - postgres
+      - minio
+      - mlflow-artifacts
+    ports:
+      - "5000:5000"
+    environment:
+      # --- tracking backend ---
+      - MLFLOW_BACKEND_STORE_URI=${MLFLOW_BACKEND_STORE_URI}
+      # --- lien vers le serveur d’artefacts ---
+      - MLFLOW_ARTIFACT_URI=http://mlflow-artifacts:5000
+      # --- accès à MinIO ---
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${MINIO_MLFLOW_BUCKET}/
+      # --- configuration de MLflow ---
+      - MLFLOW_HOST=${MLFLOW_HOST}
+      - MLFLOW_PORT=${MLFLOW_PORT}
+    command: >
+      /bin/bash -c "
+        pip install --no-cache-dir psycopg2-binary boto3 &&
+        mlflow server \
+          --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} \
+          --host ${MLFLOW_HOST} \
+          --port ${MLFLOW_PORT}
+      "
+
+  # =========================================================
+  # 📦 MLflow Artifact Server (S3/MinIO backend)
+  # =========================================================
+  mlflow-artifacts:
+    image: ghcr.io/mlflow/mlflow:${MLFLOW_VERSION}
+    container_name: mlflow-artifacts
+    depends_on:
+      - minio
+    ports:
+      - "5001:5000"  # port interne 5000, exposé en 5001 sur ta machine
+    environment:
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${MINIO_MLFLOW_BUCKET}/
+    command: >
+      /bin/bash -c "
+        pip install --no-cache-dir boto3 &&
+        mlflow server \
+          --artifacts-only \
+          --artifacts-destination s3://${MINIO_MLFLOW_BUCKET}/ \
+          --host 0.0.0.0 \
+          --port 5000
+      "
+
+  training:
+    build:
+      context: ..
+      dockerfile: ./dockerfiles/trainer/Dockerfile
+    container_name: rakuten-model_trainer
+    user: "1000:1000"
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+    environment:
+      - PYTHONPATH=/workspace
+      - PYTHONUNBUFFERED=1
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - GIT_PYTHON_REFRESH=quiet
+    command: tail -f /dev/null  # pour garder le conteneur en vie
+    tty: true
+
+networks:
+  default:
+    name: mlflow-network

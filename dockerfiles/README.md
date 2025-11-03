@@ -54,7 +54,7 @@
 
 ```bash
 # À la racine du projet Rakuten-DS
-docker-compose -f docker-compose.yml up --build
+docker-compose -f docker-compose_lionel.yml up --build
 ```
 
 **Temps de démarrage** : 2-3 minutes (téléchargement modèle spaCy)

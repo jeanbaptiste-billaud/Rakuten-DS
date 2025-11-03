@@ -143,7 +143,7 @@ Rakuten-DS/
 │   ├── README.md                  # Documentation détaillée microservices
 │   └── test_api.py                # Script de test automatisé
 │
-├── docker-compose.yml             # 🆕 Orchestration des services
+├── docker-compose_lionel.yml             # 🆕 Orchestration des services
 │
 ├── .devcontainer/                 # Configuration DevContainer
 │   ├── devcontainer.json
