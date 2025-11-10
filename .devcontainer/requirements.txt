@@ -7,8 +7,10 @@ pandas
 Pillow
 PyYAML
 Requests
-scikit_learn
+scikit_learn==1.7.2
 spacy
 tqdm
 mlflow==3.5.0
-bentoml
+bentoml==1.4.28
+boto3==1.40.69
+dvc
