@@ -1,5 +1,5 @@
 services:
-  postgres:
+  postgres: # ne pas modifier le nom
     image: postgres:15
     container_name: mlflow-postgres
     environment:
@@ -16,7 +16,7 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
+  minio: # ne pas modifier le nom
     image: minio/minio:${MINIO_VERSION}
     container_name: minio-S3-storage
     environment:
@@ -35,7 +35,7 @@ services:
       timeout: 3s
       retries: 20
 
-  create-buckets:
+  create-buckets: # ne pas modifier le nom
     image: minio/mc:${MC_VERSION}
     container_name: bucket-creator
     depends_on:
@@ -55,16 +55,16 @@ services:
       '
     restart: "no"
 
-  mc-pull:
-    image: minio/mc:${MC_VERSION}
-    container_name: mc-pull
-    volumes:
-      - ../data:/mnt/data
-      - ../src/services:/scripts
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "/scripts/pull_from_minio.sh"]
+#  mc-pull: # ne pas modifier le nom
+#    image: minio/mc:${MC_VERSION}
+#    container_name: mc-pull
+#    volumes:
+#      - ../data:/mnt/data
+#      - ../src/services:/scripts
+#    depends_on:
+#      minio:
+#        condition: service_healthy
+#    entrypoint: ["/bin/sh", "/scripts/pull_from_minio.sh"]
 
   # =========================================================
   # 🧠 MLflow Tracking Server (UI + REST API)
@@ -133,7 +133,7 @@ services:
     user: "1000:1000"
     working_dir: /workspace
     volumes:
-      - ..:/workspace
+      - ../src:/workspace/src
     environment:
       - PYTHONPATH=/workspace
       - PYTHONUNBUFFERED=1

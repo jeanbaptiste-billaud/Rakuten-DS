@@ -1,0 +1,3 @@
+- modifier les scripts services pour qu'ils utilisent les différents scripts de src montés dans les dockers:
+  - preprocessing -> utilities: sera en charge de la manipulation des dataset et de la création du model dockérisé par bentoml
+  - model -> à remplacer par le docker créé par bentoml
