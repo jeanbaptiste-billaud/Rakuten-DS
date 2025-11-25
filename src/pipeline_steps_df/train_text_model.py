@@ -1,6 +1,5 @@
 # train_text_model_mlflow.py
 
-# todo: finaliser sauvegarde du modèle avec mlflow, bucket ?
 # todo: vérifier la connexion au serveur mlflow et la sauvegarde des artefacts
 import json
 import os
@@ -18,6 +17,16 @@ DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
 
+# todo: à supprimer une fois dans le docker, on va le spécifier dans le dag airflow via un héritage des variables d'environnement du docker-compose
+if not os.getenv("MLFLOW_S3_ENDPOINT_URL"):
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://localhost:9000"
+
+if not os.getenv("AWS_ACCESS_KEY_ID"):
+    os.environ["AWS_ACCESS_KEY_ID"] = "minio"
+
+if not os.getenv("AWS_SECRET_ACCESS_KEY"):
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
+
 # --- Initialisation MLflow ---
 mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
 if mlflow_uri:
@@ -32,9 +41,6 @@ mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
 with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     run_id = run.info.run_id
-    OUTPUT_DIR = os.path.join(ROOT_PATH, f"models/text_classifier/{run_id}")
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    METRICS_PATH = os.path.join(OUTPUT_DIR, "metrics_text.json")
 
     print("📂 Chargement des données prétraitées...")
     df = pd.read_csv(DATA_PATH)
@@ -54,7 +60,7 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     print("🚀 Entraînement du modèle de classification textuelle...")
     classifier = TextClassifier()
     classifier.train(X_train, y_train)
-    mlflow.sklearn.save_model(classifier, OUTPUT_DIR)
+    mlflow.sklearn.log_model(classifier)
 
     # --- Evaluation ---
     metrics, cm, cr = classifier.evaluate(X_val, y_val)
@@ -76,11 +82,14 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     mlflow.log_metrics(metrics)  # attends un dictionnaire
 
     # --- Sauvegarde des résultats d'évaluation et enregistrement de l'emplacement du fichier dans mlflow ---
+    METRICS_PATH = "/tmp/metrics_text.json"
+
     metrics["confusion_matrix"] = cm
     metrics["classification_report"] = cr
+
     with open(METRICS_PATH, "w") as f:
         json.dump(metrics, f, indent=2)
 
-    mlflow.log_artifact(METRICS_PATH, artifact_path="metrics")  # attends fichiers (JSON, CSV, image, modèle)
+    mlflow.log_artifact(METRICS_PATH, artifact_path="metrics")
 
     print(f"🔗 MLflow Run ID : {run_id}")

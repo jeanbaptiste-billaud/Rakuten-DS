@@ -1,6 +1,5 @@
 # common_utils.py
 import os
-from minio import Minio
 
 
 def create_version_folder(v_num, root_path):

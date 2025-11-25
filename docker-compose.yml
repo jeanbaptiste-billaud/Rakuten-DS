@@ -23,7 +23,7 @@ services:
   preprocessing:
     build:
       context: .
-      dockerfile: dockerfiles/utilities/Dockerfile
+      dockerfile: dockerfiles/data/Dockerfile
     container_name: rakuten-preprocessing
     ports:
       - "8001:8001"

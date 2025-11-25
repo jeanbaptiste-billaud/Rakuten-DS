@@ -8,6 +8,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Télécharger le modèle spaCy français
 RUN python -m spacy download fr_core_news_sm
 
+COPY src/data_module_df /app/src/data_module_df
+COPY src/pipeline_steps_df/data /app
+COPY src/common_utils.py /app/src/
+
+ENV PYTHONPATH="/app/src"
+
 COPY dockerfiles/preprocessing/service.py .
 
 EXPOSE 8001
