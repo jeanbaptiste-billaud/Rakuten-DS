@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import pandas.testing as pd_testing
-from src.pipeline_steps_df.enrich_logic import select_new_samples, enrich_dataset
+from src.data_module_df.enrich_logic import select_new_samples, enrich_dataset
 
 # --- Fixtures : fausses données pour nos tests ---
 

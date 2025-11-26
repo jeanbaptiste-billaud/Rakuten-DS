@@ -2,7 +2,8 @@ import pandas as pd
 import pytest
 
 # On importe le script que l'on veut tester
-from src.pipeline_steps_df import make_original_dataset
+from src.pipeline_steps_df.data import make_original_dataset
+
 
 # --- Fixtures : Données factices ---
 

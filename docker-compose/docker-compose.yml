@@ -176,10 +176,10 @@ services:
     environment:
       - PYTHONPATH=/workspace
       - PYTHONUNBUFFERED=1
-      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
-      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=minio
-      - AWS_SECRET_ACCESS_KEY=minio123
+      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - DRIFT_DETECTOR_URL=http://drift-detector:8003
       - GIT_PYTHON_REFRESH=quiet
     depends_on:
@@ -191,7 +191,22 @@ services:
   # ========================================
   # SERVICE data (preprocessing etc.)
   # ========================================
-
+  data:
+    build:
+      context: ..
+      dockerfile: dockerfiles/data/Dockerfile
+    image: spacy:3.7.5
+    user: "1000:1000"
+    working_dir: /workspace
+    environment:
+      - PYTHONPATH=/workspace
+      - PYTHONUNBUFFERED=1
+      - MINIO_HOST=${MINIO_HOST}
+      - MINIO_PORT=${MINIO_PORT}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+    command: tail -f /dev/null  # pour garder le conteneur en vie
+    tty: true
 
 networks:
   default:

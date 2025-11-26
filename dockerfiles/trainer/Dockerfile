@@ -5,5 +5,12 @@ WORKDIR /workspace
 COPY dockerfiles/trainer/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir -p /src && touch /src/__init__.py
+COPY src/pipeline_steps_df/training /src
+COPY src/models_module /src/models_module
+COPY src/utils /src/utils
+
+ENV PYTHONPATH="/src"
+
 RUN useradd -m -u 1000 trainusr
 USER trainusr

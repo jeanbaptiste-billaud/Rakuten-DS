@@ -2,12 +2,11 @@
 import os
 import pandas as pd
 
-from src.common_utils import get_project_root
+from src.utils.common_utils import get_project_root
 from src.data_module_df.data_text import preprocess_dataframe, save_class_distribution
 
 if __name__ == "__main__":
-
-    root = get_project_root()
+    root = "/"  # get_project_root()
     data_dir = os.path.join(root, "data")
 
     raw_path = os.path.join(data_dir, "dataset/raw_dataset.csv")
@@ -19,7 +18,7 @@ if __name__ == "__main__":
 
     # Fusion des colonnes texte
     df["designation_description"] = (
-        df["designation"].fillna("") + " " + df["description"].fillna("")
+            df["designation"].fillna("") + " " + df["description"].fillna("")
     ).str.strip()
 
     print("🔄 Prétraitement du texte...")

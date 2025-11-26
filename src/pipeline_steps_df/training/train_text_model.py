@@ -8,11 +8,11 @@ import mlflow
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from src.common_utils import get_project_root
+from src.utils.common_utils import get_project_root
 from src.models_module_df.model_text_classifier import TextClassifier
 
 # --- Configuration ---
-ROOT_PATH = get_project_root()
+ROOT_PATH = "/"  # get_project_root()
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"

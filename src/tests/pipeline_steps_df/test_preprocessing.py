@@ -1,9 +1,9 @@
 import pandas as pd
-import pandas.testing as pd_testing
 import pytest
 import numpy as np
 
-from src.pipeline_steps_df import preprocessing
+from src.pipeline_steps_df.data import preprocessing
+
 
 # --- Fixtures : Données factices ---
 

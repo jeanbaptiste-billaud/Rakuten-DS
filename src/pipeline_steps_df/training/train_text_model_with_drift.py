@@ -8,11 +8,11 @@ from datetime import datetime
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from src.common_utils import get_project_root
+from src.utils.common_utils import get_project_root
 from src.models_module_df.model_text_classifier import TextClassifier
 
 # --- Configuration ---
-ROOT_PATH = get_project_root()
+ROOT_PATH = "/"  # get_project_root()
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
@@ -23,7 +23,7 @@ if not os.getenv("MLFLOW_S3_ENDPOINT_URL"):
 
 if not os.getenv("AWS_ACCESS_KEY_ID"):
     os.environ["AWS_ACCESS_KEY_ID"] = "minio"
-    
+
 if not os.getenv("AWS_SECRET_ACCESS_KEY"):
     os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
 
@@ -82,7 +82,7 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
 
     # --- Log des métriques ---
     mlflow.log_metrics(metrics)
-    METRICS_PATH = "/tmp/metrics_text.json" 
+    METRICS_PATH = "/tmp/metrics_text.json"
 
     # --- Sauvegarde des résultats d'évaluation ---
     metrics["confusion_matrix"] = cm
@@ -98,7 +98,7 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     # 🆕 DÉTECTION DE DRIFT
     # ========================================
     print("\n🔍 Envoi des données au drift detector...")
-    
+
     try:
         drift_payload = {
             "run_id": run_id,
@@ -111,35 +111,35 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
                 "macro_f1": float(metrics["macro_f1"])
             }
         }
-        
+
         response = requests.post(
             f"{DRIFT_DETECTOR_URL}/log-evaluation",
             json=drift_payload,
             params={"drift_threshold": 0.05},
             timeout=30
         )
-        
+
         if response.status_code == 200:
             drift_report = response.json()
-            
-            print("\n" + "="*60)
+
+            print("\n" + "=" * 60)
             print("📊 RAPPORT DE DRIFT")
-            print("="*60)
+            print("=" * 60)
             print(f"Drift détecté      : {'⚠️  OUI' if drift_report['drift_detected'] else '✅ NON'}")
             print(f"Accuracy actuelle  : {drift_report['current_accuracy']:.4f}")
             print(f"Accuracy référence : {drift_report['reference_accuracy']:.4f}")
-            print(f"Dégradation        : {drift_report['accuracy_drop']:.4f} ({drift_report['accuracy_drop']*100:.2f}%)")
-            print(f"Seuil              : {drift_report['drift_threshold']:.4f} ({drift_report['drift_threshold']*100:.2f}%)")
+            print(f"Dégradation        : {drift_report['accuracy_drop']:.4f} ({drift_report['accuracy_drop'] * 100:.2f}%)")
+            print(f"Seuil              : {drift_report['drift_threshold']:.4f} ({drift_report['drift_threshold'] * 100:.2f}%)")
             print(f"Rapport HTML       : {drift_report['report_path']}")
-            print("="*60 + "\n")
-            
+            print("=" * 60 + "\n")
+
             # Logger dans MLflow
             mlflow.log_metrics({
                 "drift_detected": 1.0 if drift_report['drift_detected'] else 0.0,
                 "accuracy_drop": drift_report['accuracy_drop'],
                 "reference_accuracy": drift_report['reference_accuracy']
             })
-            
+
             if drift_report['drift_detected']:
                 print("⚠️  ALERTE : Drift de performance détecté !")
                 print("   → Considérer un réentraînement du modèle")
@@ -147,7 +147,7 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
         else:
             print(f"⚠️  Erreur lors de la détection de drift: {response.status_code}")
             print(f"   Message: {response.text}")
-    
+
     except requests.exceptions.ConnectionError:
         print("⚠️  Service drift-detector non disponible")
         print("   Le training continue sans détection de drift")
