@@ -93,7 +93,7 @@ class PipelineConfig:
         self.save_yaml(self.config_path)
 
     def validate_paths(self):
-        for path in [self.data_path, self.image_dir, self.model_path]:
+        for path in [self.data_path, self.image_dir, self.model_path]:# Où sont définis ces attributs ?
             if not path.exists():
                 raise FileNotFoundError(f"Chemin introuvable : {path}")
 

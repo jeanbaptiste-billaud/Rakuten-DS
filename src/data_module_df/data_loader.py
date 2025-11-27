@@ -23,11 +23,12 @@ def load_processed_npz(name, data_dir):
 
 def save_processed_npz(data, name, data_dir):
     os.makedirs(os.path.join(data_dir, "processed"), exist_ok=True)
-    np.savez(os.path.join(data_dir, f"{name}.npz"), **{f"{name}_": data})
+    np.savez(os.path.join(data_dir, f"{name}.npz"), **{f"{name}_": data}) #BUG: le dossier "processed" n'est pas utilisé ici
 
 def load_index_split(data_dir):
     d = np.load(os.path.join(data_dir, "processed/index_split.npz"), allow_pickle=True)
     return {k: d[k] for k in d.files}
 
 def save_index_split(indices_dict, data_dir):
+    # BUG: Il manque os.makedirs() ici pour créer le dossier "processed"
     np.savez(os.path.join(data_dir, "processed/indices_split.npz"), **indices_dict)

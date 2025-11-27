@@ -6,6 +6,7 @@ import json
 import os
 
 # Chargement du modèle spaCy français
+# Suggestion : Implémenter une fonction de lazy loading pour accélérer les tests
 try:
     nlp = spacy.load("fr_core_news_sm")
 except OSError:
