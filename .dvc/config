@@ -3,15 +3,3 @@
     remote = origin
 ['remote "origin"']
     url = https://dagshub.com/jeanbaptiste-billaud/Rakuten-DS.dvc
-['remote "minio_raw"']
-    url = s3://raw
-    endpointurl = http://localhost:9000
-    use_ssl = false
-['remote "minio_dataset"']
-    url = s3://dataset
-    endpointurl = http://localhost:9000
-    use_ssl = false
-['remote "minio_preprocessed"']
-    url = s3://preprocessed
-    endpointurl = http://localhost:9000
-    use_ssl = false
