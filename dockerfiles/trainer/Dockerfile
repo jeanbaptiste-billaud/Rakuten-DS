@@ -13,4 +13,6 @@ COPY src/utils /src/utils
 ENV PYTHONPATH="/"
 
 RUN useradd -m -u 1000 trainusr
+COPY --chown=trainusr:trainusr src ./src
+COPY --chown=trainusr:trainusr configs ./configs
 USER trainusr
