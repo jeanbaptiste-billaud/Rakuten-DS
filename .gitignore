@@ -5,3 +5,4 @@ data/images/**
 *.npz
 logs/
 *.log
+*.env
