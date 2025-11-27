@@ -5,8 +5,8 @@ import pandas as pd
 from src.utils.common_utils import get_project_root
 from src.data_module_df.data_text import preprocess_dataframe, save_class_distribution
 
-if __name__ == "__main__":
-    root = "/"  # get_project_root()
+def main():
+    root = "/" # get_project_root()
     data_dir = os.path.join(root, "data")
 
     raw_path = os.path.join(data_dir, "dataset/raw_dataset.csv")
@@ -33,3 +33,6 @@ if __name__ == "__main__":
     save_class_distribution(df, "prdtypecode", os.path.join(output_dir, "class_distribution.json"))
 
     print("🎉 Prétraitement terminé avec succès.")
+
+if __name__ == "__main__":
+    main()
