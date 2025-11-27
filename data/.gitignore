@@ -1,4 +1,5 @@
 /preprocessed
 /dataset
 /pgdata
-/mlflow_db.sql
+/mlflow-artifacts
+/mlflow_db.tar.gz

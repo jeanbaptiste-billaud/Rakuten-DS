@@ -1,11 +1,19 @@
 ARG VERSION
-
 FROM minio/mc:${VERSION}
 
-RUN mkdir -p /src
+# Create script directory and config directory
+RUN mkdir -p /src /config
+
+# Create a wrapper to force mc to use the custom config directory
+RUN printf '#!/bin/sh\nexec /usr/bin/mc --config-dir /config "$@"\n' \
+        > /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc
+
+# Copy scripts
 COPY dockerfiles/minio-client/minio_init.sh /src/minio_init.sh
 COPY dockerfiles/minio-client/minio_backup.sh /src/minio_backup.sh
 
-RUN chmod +x /init/init.sh
+# Make scripts executable
+RUN chmod +x /src/minio_init.sh /src/minio_backup.sh
 
 ENTRYPOINT ["/bin/sh", "-c"]
