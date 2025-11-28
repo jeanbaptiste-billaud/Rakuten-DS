@@ -1,0 +1,12 @@
+#src/bentoml_module/bentofile.yaml
+
+service: "service:svc"
+labels:
+ model_source: "mlflow"
+include:
+ - service.py
+python:
+ packages:
+  - bentoml
+  - scikit-learn==1.5.2 # alignez avec MLflow
+  - pydantic

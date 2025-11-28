@@ -1,5 +1,7 @@
 import argparse
 import os
+
+from src.utils.common_utils import get_project_root
 from src.utils.minio_utils import push_data, pull_data  # adapte l’import selon ton projet
 
 
@@ -19,7 +21,8 @@ def main():
     args = parser.parse_args()
 
     bucket_name = args.folder
-    local_folder = os.path.join("/workspace/data", args.folder)  # puisque dossier = bucket
+    ROOT_PATH = os.getenv("WORKDIR", get_project_root())
+    local_folder = os.path.join(ROOT_PATH,"data", args.folder)  # puisque dossier = bucket
 
     if args.mode == "push":
         print(f"📤 PUSH : {local_folder} → bucket `{bucket_name}`")

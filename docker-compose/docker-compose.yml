@@ -1,18 +1,18 @@
-x-mlflow-common: &mlflow-common
-  image: mlflow:${MLFLOW_VERSION}
-  env_file:
-    - ${ENV_FILE_PATH:-.env}
-  environment: &mlflow-common-env
-    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-    MLFLOW_S3_ENDPOINT_URL: http://${MINIO_HOST}:${MINIO_PORT}
-    MLFLOW_DEFAULT_ARTIFACT_ROOT: s3://${MINIO_MLFLOW_BUCKET}/
-  depends_on:
-    &mlflow-common-depends-on
-    postgres:
-      condition: service_healthy
-    minio:
-      condition: service_healthy
+#x-mlflow-common: &mlflow-common
+#  image: mlflow:${MLFLOW_VERSION}
+#  env_file:
+#    - ${ENV_FILE_PATH:-.env}
+#  environment: &mlflow-common-env
+#    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+#    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+#    MLFLOW_S3_ENDPOINT_URL: http://${MINIO_HOST}:${MINIO_PORT}
+##    MLFLOW_DEFAULT_ARTIFACT_ROOT: ${MLFLOW_DEFAULT_ARTIFACT_ROOT}/
+#  depends_on:
+#    &mlflow-common-depends-on
+#    postgres:
+#      condition: service_healthy
+#    minio:
+#      condition: service_healthy
 
 services:
   minio: # ne pas modifier le nom
@@ -21,10 +21,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-#    volumes:
-#      - ../data/minio-data:/data
-#      - ../data:/mnt/data
     command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -73,7 +72,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -92,15 +91,20 @@ services:
     env_file:
       - ${ENV_FILE_PATH:-.env}
     depends_on:
-      <<: *mlflow-common-depends-on
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "5000:5000"
     environment:
-      <<: *mlflow-common-env
       # --- tracking backend ---
       MLFLOW_BACKEND_STORE_URI: "${MLFLOW_BACKEND_STORE_URI}"
-      # --- lien vers le serveur d’artefacts ---
+      # --- Configuration serveur d’artefacts ---
       MLFLOW_ARTIFACT_URI: "http://mlflow-artifacts:5000"
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://${MINIO_HOST}:${MINIO_PORT}
       # --- configuration de MLflow ---
       MLFLOW_HOST: "${MLFLOW_HOST}"
       MLFLOW_PORT: "${MLFLOW_PORT}"
@@ -115,21 +119,21 @@ services:
   # =========================================================
   # 📦 MLflow Artifact Server (S3/MinIO backend)
   # =========================================================
-  mlflow-artifacts:
-    <<: *mlflow-common
-    container_name: mlflow-artifacts
-    depends_on:
-      <<: *mlflow-common-depends-on
-    ports:
-      - "5001:5000"  # port interne 5000, exposé en 5001 sur ta machine
-    environment:
-      <<: *mlflow-common-env
-    command: >
-      mlflow server 
-        --artifacts-only 
-        --host ${MLFLOW_HOST}
-        --port ${MLFLOW_PORT}
-        --artifacts-destination s3://${MINIO_MLFLOW_BUCKET}/ 
+#  mlflow-artifacts:
+#    <<: *mlflow-common
+#    container_name: mlflow-artifacts
+#    depends_on:
+#      <<: *mlflow-common-depends-on
+#    ports:
+#      - "5001:5000"  # port interne 5000, exposé en 5001 sur ta machine
+#    environment:
+#      <<: *mlflow-common-env
+#    command: >
+#      mlflow server
+#        --artifacts-only
+#        --host ${MLFLOW_HOST}
+#        --port ${MLFLOW_PORT}
+#        --artifacts-destination s3://${MINIO_MLFLOW_BUCKET}/
 
   # ========================================
   # 🆕 SERVICE DRIFT DETECTOR
@@ -152,59 +156,6 @@ services:
       timeout: 10s
       retries: 3
 
-# ===============================================================
-#  SERVICES à extraire du compose et à appeler via un dag aiflow
-# ===============================================================
-
-  # ========================================
-  # SERVICE TRAINING (avec drift detection)
-  # ========================================
-  training:
-    build:
-      context: ..
-      dockerfile: ./dockerfiles/trainer/Dockerfile
-    image: sklearn:v1.7.2
-    container_name: rakuten-model_trainer
-    user: "1000:1000"
-    working_dir: /workspace
-    volumes:
-      - ../src:/src
-      - ../data:/data
-      - ../models:/workspace/models
-    environment:
-      - PYTHONUNBUFFERED=1
-      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
-      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - DRIFT_DETECTOR_URL=http://drift-detector:8003
-      - GIT_PYTHON_REFRESH=quiet
-    depends_on:
-      - mlflow-server
-      - drift-detector
-    command: tail -f /dev/null  # pour garder le conteneur en vie
-    tty: true
-
-  # ========================================
-  # SERVICE data (preprocessing etc.)
-  # ========================================
-  data:
-    build:
-      context: ..
-      dockerfile: dockerfiles/data/Dockerfile
-    image: spacy:3.7.5
-    container_name: data
-    user: "1000:1000"
-    working_dir: /workspace
-    environment:
-      - PYTHONPATH=/workspace
-      - PYTHONUNBUFFERED=1
-      - MINIO_HOST=${MINIO_HOST}
-      - MINIO_PORT=${MINIO_PORT}
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-    command: tail -f /dev/null  # pour garder le conteneur en vie
-    tty: true
 
   # =====================================================================
   # 🟦 PROMETHEUS (Monitoring)
@@ -300,6 +251,7 @@ services:
       airflow db init &&
       airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
       "
+
   airflow-webserver:
     image: apache/airflow:2.7.1
     container_name: airflow-webserver
@@ -321,7 +273,7 @@ services:
     volumes:
       - ../dags:/opt/airflow/dags
       - ../logs/airflow:/opt/airflow/logs
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -348,6 +300,66 @@ services:
       - ../logs/airflow:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
     command: scheduler
+
+# ===============================================================
+#  SERVICES à extraire du compose et à appeler via un dag aiflow
+# ===============================================================
+
+  # ========================================
+  # SERVICE TRAINING (avec drift detection)
+  # ========================================
+  trainer:
+    build:
+      context: ..
+      dockerfile: ./dockerfiles/trainer/Dockerfile
+      args:
+        - WORKING_DIR=${WORKDIR}
+    image: sklearn:v1.7.2
+    container_name: rakuten-model_trainer
+    user: "1000:1000"
+    working_dir: ${WORKDIR}
+    volumes:
+      - ../src:/src
+      - ../data:/data
+      - ../models:${WORKDIR}/models
+    environment:
+      - WORKDIR=${WORKDIR}
+      - PYTHONUNBUFFERED=1
+      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - DRIFT_DETECTOR_URL=http://drift-detector:8003
+      - GIT_PYTHON_REFRESH=quiet
+    depends_on:
+      - mlflow-server
+      - drift-detector
+    command: tail -f /dev/null  # pour garder le conteneur en vie
+    tty: true
+
+  # ========================================
+  # SERVICE data (preprocessing etc.)
+  # ========================================
+  data:
+    build:
+      context: ..
+      dockerfile: dockerfiles/data/Dockerfile
+      args:
+        - WORKING_DIR=${WORKDIR}
+    image: spacy:3.7.5
+    container_name: data
+    user: "1000:1000"
+    working_dir: ${WORKDIR}
+    environment:
+      - WORKDIR=${WORKDIR}
+      - PYTHONUNBUFFERED=1
+      - MINIO_HOST=${MINIO_HOST}
+      - MINIO_PORT=${MINIO_PORT}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+    command: tail -f /dev/null  # pour garder le conteneur en vie
+    tty: true
+
 networks:
   default:
     name: mlflow-network
@@ -357,3 +369,5 @@ volumes:
   drift_reports:
   mlflow_db:
     name: mlflow_db
+  minio_data:
+    name: minio_data

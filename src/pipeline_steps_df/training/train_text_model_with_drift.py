@@ -6,13 +6,14 @@ import requests
 from datetime import datetime
 
 import pandas as pd
+from mlflow.models import infer_signature
 from sklearn.model_selection import train_test_split
 
 from src.utils.common_utils import get_project_root
 from src.models_module_df.model_text_classifier import TextClassifier
 
 # --- Configuration ---
-ROOT_PATH = "/"  # get_project_root()
+ROOT_PATH = os.getenv("WORKDIR", get_project_root())
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
@@ -39,7 +40,7 @@ else:
 
 mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
-with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
+with mlflow.start_run() as run:
     run_id = run.info.run_id
 
     print("📂 Chargement des données prétraitées...")
@@ -60,7 +61,8 @@ with mlflow.start_run(run_name="SVM_TFIDF_TextClassifier") as run:
     print("🚀 Entraînement du modèle de classification textuelle...")
     classifier = TextClassifier()
     classifier.train(X_train, y_train)
-    mlflow.sklearn.log_model(classifier)
+    signature = infer_signature(X_val, classifier.predict(X_val))
+    mlflow.sklearn.log_model(classifier, signature=signature, name="rakuten_text_classifier")
 
     # --- Evaluation ---
     print("📊 Évaluation du modèle...")

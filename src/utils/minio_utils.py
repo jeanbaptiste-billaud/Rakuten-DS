@@ -18,9 +18,10 @@ class BucketNotFoundError(Exception):
 def minio_bucket_connect(bucket_name: str):
     host = os.getenv("MINIO_HOST", "localhost")
     port = int(os.getenv("MINIO_PORT", "9000"))
-    endpoint = f"{host}:{port}"
-    access_key = os.getenv("MINIO_ACCESS_KEY")
-    secret_key = os.getenv("MINIO_SECRET_KEY")
+    endpoint = os.getenv("MLFLOW_S3_ENDPOINT_URL",f"{host}:{port}")
+    endpoint = endpoint.removeprefix("http://")
+    access_key = os.getenv("MINIO_ACCESS_KEY", "AWS_ACCESS_KEY_ID")
+    secret_key = os.getenv("MINIO_SECRET_KEY", "AWS_SECRET_ACCESS_KEY")
 
     client = Minio(endpoint=endpoint,
                    access_key=access_key,
