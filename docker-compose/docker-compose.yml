@@ -277,7 +277,7 @@ services:
       - "8000:8000"
     environment:
       - PREPROCESSING_SERVICE_URL=http://data:8001
-      - MODEL_SERVICE_URL=http://model-serving:8002
+      - MODEL_SERVICE_URL=http://model-serving_provisoire:8002
     depends_on:
       - data
       - model-serving
