@@ -5,7 +5,7 @@ WORKDIR /app
 COPY dockerfiles/api-gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY docker/api-gateway/app.py .
+COPY dockerfiles/api-gateway/app.py .
 
 EXPOSE 8000
 
