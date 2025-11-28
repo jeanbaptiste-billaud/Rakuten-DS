@@ -84,7 +84,7 @@ services:
   mlflow-server:
     build:
       context: ..
-      dockerfile: ./dockerfiles/mlfow/Dockerfile
+      dockerfile: ./dockerfiles/mlflow/Dockerfile
       args:
         - VERSION=${MLFLOW_VERSION}
     image: mlflow:${MLFLOW_VERSION}
