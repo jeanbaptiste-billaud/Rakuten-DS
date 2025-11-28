@@ -291,9 +291,6 @@ services:
     container_name: airflow-init
     depends_on:
       - postgres
-    user: "${AIRFLOW_UID}:0"
-    group_add:
-      - "${AIRFLOW_GID}"
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/postgres
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
@@ -319,6 +316,8 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/postgres
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     volumes:
       - ../dags:/opt/airflow/dags
       - ../logs/airflow:/opt/airflow/logs

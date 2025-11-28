@@ -22,7 +22,10 @@ COPY dockerfiles/data/service.py .
 
 # Créer un utilisateur sans privilèges
 RUN useradd -m -u 1000 trainusr
+RUN mkdir -p /workspace/data && chown -R trainusr:trainusr /workspace
 USER trainusr
+
+
 
 EXPOSE 8001
 
