@@ -1,0 +1,6 @@
+outs:
+- md5: e69132220423a79e65e6fe648436c357.dir
+  size: 7375680
+  nfiles: 6
+  hash: md5
+  path: mlflow-artifacts

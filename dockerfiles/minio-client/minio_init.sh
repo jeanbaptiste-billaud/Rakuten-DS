@@ -1,31 +1,46 @@
 #!/bin/sh
 
-# Désactivation du mode stop-on-error
-# car mc mirror et mc cp retournent souvent un code non zéro.
+# Désactive l'arrêt sur erreur
 set +e
 
 echo "🔗 Configuration de l'alias MinIO..."
 mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
 
-echo "🪣 Création des buckets (ignore si existent déjà)..."
-mc mb --ignore-existing myminio/${MINIO_MLFLOW_BUCKET:-mlflow}
+echo "🪣 Création du bucket raw et import du csv..."
 mc mb --ignore-existing myminio/raw
-mc mb --ignore-existing myminio/dataset
-mc mb --ignore-existing myminio/preprocessed
-
-echo "📤 Upload du fichier RAW (ignore si absent)..."
 if [ -f /mnt/data/raw/all_raw_data.csv ]; then
     mc cp /mnt/data/raw/all_raw_data.csv myminio/raw/all_raw_data.csv
 fi
 
-echo "🔄 Mirroring dataset..."
-if [ -d /mnt/data/dataset ]; then
-    mc mirror --overwrite /mnt/data/dataset myminio/dataset
-fi
+# Liste des buckets à créer / synchroniser
+BUCKETS_LIST=("dataset" "preprocessed" "${MINIO_MLFLOW_BUCKET}")
 
-echo "🔄 Mirroring preprocessed..."
-if [ -d /mnt/data/preprocessed ]; then
-    mc mirror --overwrite /mnt/data/preprocessed myminio/preprocessed
-fi
+# Base locale contenant les données
+DATA_PATH="/mnt/data"
 
+echo ""
+echo "Début de la création et synchronisation des buckets MinIO..."
+echo "-----------------------------------------------------------"
+
+for BUCKET in "${BUCKETS_LIST[@]}"; do
+    echo ""
+    echo "▶️  Traitement du bucket : ${BUCKET}"
+
+    DESTINATION="myminio/${BUCKET}/"
+    SOURCE="${DATA_PATH}/${BUCKET}/"
+
+    echo "🪣 Création du bucket s'il n'existe pas..."
+    mc mb --ignore-existing ${DESTINATION}
+
+    echo "🔄 Mirroring du dossier local : ${SOURCE}"
+    if [ -d "${SOURCE}" ]; then
+        mc mirror --overwrite "${SOURCE}" "${DESTINATION}"
+    else
+        echo "⚠️  Le dossier local ${SOURCE} n'existe pas, on saute."
+    fi
+done
+
+echo ""
 echo "✅ Initialisation MinIO terminée."
+
+tail -f /dev/null
