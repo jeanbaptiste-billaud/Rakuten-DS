@@ -19,7 +19,7 @@ def main():
     args = parser.parse_args()
 
     bucket_name = args.folder
-    local_folder = os.path.join("/data", args.folder)  # puisque dossier = bucket
+    local_folder = os.path.join("/workspace/data", args.folder)  # puisque dossier = bucket
 
     if args.mode == "push":
         print(f"📤 PUSH : {local_folder} → bucket `{bucket_name}`")
