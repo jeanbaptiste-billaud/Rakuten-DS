@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-COPY dockerfiles/data/requirements.txt .
+COPY docker/data/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Télécharger le modèle spaCy français
@@ -13,7 +13,7 @@ COPY src/utils /src/utils
 
 ENV PYTHONPATH="/"
 
-COPY dockerfiles/data/service.py .
+COPY docker/data/service.py .
 
 RUN useradd -m -u 1000 trainusr
 USER trainusr

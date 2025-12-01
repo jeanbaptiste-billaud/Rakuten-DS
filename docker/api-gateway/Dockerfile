@@ -2,10 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY dockerfiles/api-gateway/requirements.txt .
+COPY docker/api-gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY dockerfiles/api-gateway/app.py .
+COPY docker/api-gateway/app.py .
 
 EXPOSE 8000
 

@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-COPY dockerfiles/trainer/requirements.txt .
+COPY docker/trainer/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /src && touch /src/__init__.py

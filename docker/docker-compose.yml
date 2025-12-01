@@ -36,7 +36,7 @@ services:
   minio-client: # ne pas modifier le nom
     build:
       context: ..
-      dockerfile: dockerfiles/minio-client/Dockerfile
+      dockerfile: docker/minio-client/Dockerfile
       args:
         - VERSION=${MC_VERSION}
     image: minio-client:${MC_VERSION}
@@ -53,7 +53,7 @@ services:
         condition: service_healthy
     volumes:
       - ../data:/mnt/data
-      - ../dockerfiles/minio-client/mc-config:/config
+      - ../docker/minio-client/mc-config:/config
     command: "/src/minio_init.sh > /proc/1/fd/1 2>&1 ; tail -f /dev/null"
     tty: true
 
@@ -83,7 +83,7 @@ services:
   mlflow-server:
     build:
       context: ..
-      dockerfile: ./dockerfiles/mlflow/Dockerfile
+      dockerfile: docker/mlflow/Dockerfile
       args:
         - VERSION=${MLFLOW_VERSION}
     image: mlflow:${MLFLOW_VERSION}
@@ -140,8 +140,7 @@ services:
   # ========================================
   drift-detector:
     build:
-      context: ../dockerfiles/drift-detector
-      dockerfile: Dockerfile
+      context: drift-detector
     image: evidently:v0.4.33
     container_name: drift-detector
     ports:
@@ -198,7 +197,7 @@ services:
   model-serving:
     build:
       context: ..
-      dockerfile: dockerfiles/model-serving/Dockerfile
+      dockerfile: docker/model-serving/Dockerfile
     image: model-serving:latest
     container_name: model-serving
     ports:
@@ -221,7 +220,7 @@ services:
   api-gateway:
     build:
       context: ..
-      dockerfile: dockerfiles/api-gateway/Dockerfile
+      dockerfile: docker/api-gateway/Dockerfile
     image: api-gateway:latest
     container_name: api-gateway
     ports:
@@ -311,7 +310,7 @@ services:
   trainer:
     build:
       context: ..
-      dockerfile: ./dockerfiles/trainer/Dockerfile
+      dockerfile: docker/trainer/Dockerfile
       args:
         - WORKING_DIR=${WORKDIR}
     image: sklearn:v1.7.2
@@ -343,7 +342,7 @@ services:
   data:
     build:
       context: ..
-      dockerfile: dockerfiles/data/Dockerfile
+      dockerfile: docker/data/Dockerfile
       args:
         - WORKING_DIR=${WORKDIR}
     image: spacy:3.7.5
