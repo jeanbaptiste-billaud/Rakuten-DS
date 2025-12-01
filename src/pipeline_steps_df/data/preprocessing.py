@@ -6,7 +6,7 @@ from src.utils.common_utils import get_project_root
 from src.data_module_df.data_text import preprocess_dataframe, save_class_distribution
 
 def main():
-    root = "/" # get_project_root()
+    root = os.getenv("WORKDIR", get_project_root())
     data_dir = os.path.join(root, "data")
 
     raw_path = os.path.join(data_dir, "dataset/raw_dataset.csv")

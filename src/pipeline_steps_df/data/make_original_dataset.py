@@ -10,7 +10,7 @@ def main():
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    root = "/"  # get_project_root()
+    root = os.getenv("WORKDIR", get_project_root())
     data_dir = os.path.join(root, "data")
 
     input_csv = os.path.join(data_dir, "raw/all_raw_data.csv")

@@ -3,11 +3,12 @@ import os
 import pandas as pd
 
 from src.data_module_df.enrich_logic import select_new_samples, enrich_dataset
+from src.utils.common_utils import get_project_root
 
 
 def main(n_new_samples=1000, seed=42):
     # Détermination du root du projet
-    root = "/"  # get_project_root()
+    root = os.getenv("WORKDIR", get_project_root())
     data_dir = os.path.join(root, "data")
 
     all_data_path = os.path.join(data_dir, "raw/all_raw_data.csv")
