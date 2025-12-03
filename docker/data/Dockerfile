@@ -11,9 +11,9 @@ COPY src/data_module_df /src/data_module_df
 COPY src/pipeline_steps_df/data /src
 COPY src/utils /src/utils
 
-ENV PYTHONPATH="/"
-
 COPY docker/data/service.py .
+
+ENV PYTHONPATH="/"
 
 RUN useradd -m -u 1000 trainusr
 USER trainusr

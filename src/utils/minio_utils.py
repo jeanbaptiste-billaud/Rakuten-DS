@@ -20,8 +20,8 @@ def minio_bucket_connect(bucket_name: str):
     port = int(os.getenv("MINIO_PORT", "9000"))
     endpoint = os.getenv("MLFLOW_S3_ENDPOINT_URL",f"{host}:{port}")
     endpoint = endpoint.removeprefix("http://")
-    access_key = os.getenv("MINIO_ACCESS_KEY", "AWS_ACCESS_KEY_ID")
-    secret_key = os.getenv("MINIO_SECRET_KEY", "AWS_SECRET_ACCESS_KEY")
+    access_key = os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID")
+    secret_key = os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
 
     client = Minio(endpoint=endpoint,
                    access_key=access_key,

@@ -69,3 +69,49 @@ def generate_text_dataset(df, target_size=None, min_per_class=300, random_state=
         print(f"💾 Dataset sauvegardé dans {save_path}")
 
     return final_df
+
+
+class Categories:
+    def __init__(self):
+        """Initialise le mapping des catégories Rakuten"""
+
+        # Mapping officiel prdtypecode → nom de catégorie
+        self.category_names = {
+            10: "Livres",
+            2280: "Jeux vidéo",
+            50: "Jouets & Jeux",
+            1280: "Accessoires téléphones",
+            2705: "Accessoires console",
+            2522: "Équipement bébé",
+            2582: "Matériel & accessoires",
+            1560: "Photos",
+            1281: "Téléphonie fixe",
+            1920: "Musique amplifiée",
+            2403: "Livres en langues étrangères",
+            1140: "TV",
+            2583: "Articles sport",
+            1180: "Décoration",
+            1300: "Jeux vidéo ancien",
+            2462: "Fournitures bureau",
+            1160: "Électroménager",
+            2060: "Articles soins",
+            40: "DVD & Films",
+            60: "Consoles",
+            1320: "CD",
+            1302: "Jeux vidéo rétro",
+            2220: "Puériculture",
+            2905: "Instruments musique",
+            2585: "Sports & Loisirs",
+            1940: "Instrument musique",
+            1301: "Consoles rétro",
+        }
+
+        # Mapping prdtypecode → index interne consécutif (0, 1, 2, …)
+        self.category_to_idx = {
+            code: idx for idx, code in enumerate(sorted(self.category_names.keys()))
+        }
+
+        # Mapping inverse index → prdtypecode
+        self.idx_to_category = {
+            idx: code for code, idx in self.category_to_idx.items()
+        }

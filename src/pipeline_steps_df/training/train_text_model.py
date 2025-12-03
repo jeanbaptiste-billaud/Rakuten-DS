@@ -1,6 +1,5 @@
 # train_text_model_mlflow.py
 
-# todo: vérifier la connexion au serveur mlflow et la sauvegarde des artefacts
 import json
 import os
 import mlflow

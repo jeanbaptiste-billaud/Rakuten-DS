@@ -1,4 +1,4 @@
-# src/bentoml_module/build_step.py
+# src/model_serving/build_step.py
 
 import os
 import mlflow
@@ -22,11 +22,17 @@ def get_model_uri():
 
 
 model_uri = get_model_uri()
+model_id = model_uri.removeprefix("models:/")
+run_id = os.getenv("MLFLOW_RUN_ID")
+
 bento_model = bentoml.mlflow.import_model(
-    name="rakuten_text_classifier",
+    name=f"rakuten_text_classifier:{run_id}",
     model_uri=model_uri,
-    metadata={"mlflow_uri": model_uri, "model_version": 1})
-# todo: modifier model version
+    metadata={"mlflow_uri": model_uri,
+              "model_id": model_uri.removeprefix("models:/"),
+              "mlflow_run_id": run_id,},
+)
+
 
 print("Model registered as Bento:", bento_model)
 
