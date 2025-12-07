@@ -4,10 +4,9 @@ import pandas as pd
 
 from src.utils.common_utils import get_project_root
 from src.data_module_df.data_text import preprocess_dataframe, save_class_distribution
-
+WORKDIR = os.getenv("WORKDIR", "/workspace")
 def main():
-    root = os.getenv("WORKDIR", get_project_root())
-    data_dir = os.path.join(root, "data")
+    data_dir = os.path.join(WORKDIR, "data")
 
     raw_path = os.path.join(data_dir, "dataset/raw_dataset.csv")
     output_dir = os.path.join(data_dir, "preprocessed")
