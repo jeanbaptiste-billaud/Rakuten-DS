@@ -13,6 +13,8 @@ import os
 CURRENT_DIR = os.getcwd()
 MINIO_USER = os.getenv("MINIO_ROOT_USER", "minio")
 MINIO_PASS = os.getenv("MINIO_ROOT_PASSWORD", "minio123")
+WORKDIR = os.getenv("WORKDIR", "/workspace")
+DATA_VOLUME = "airflow_data"
 # Configuration commune pour éviter de répéter le code dans chaque tâche
 DOCKER_COMMON_ARGS = {
     "image": "spacy:3.7.5",  # Votre image locale
@@ -23,15 +25,12 @@ DOCKER_COMMON_ARGS = {
     "network_mode": "mlflow-network", # Pour parler à MinIO et MLflow
     "working_dir": "/workspace",  # Dossier de travail DANS le conteneur éphémère
     "mounts": [
-        # # On monte le code source pour qu'il soit à jour
-        # Mount(source=f"{CURRENT_DIR}/src", target="/workspace/src", type="bind"),
-        # On monte les données pour qu'elles persistent entre les étapes
-        Mount(source=f"{CURRENT_DIR}/data", target="/workspace/data", type="bind"),
-        # # On monte les configs
-        # Mount(source=f"{CURRENT_DIR}/configs", target="/workspace/configs", type="bind"),
+        Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
     ],
+    "user":"trainusr",
     "environment": {
         # Indispensable pour que python trouve le module 'src'
+        "WORKDIR": WORKDIR,
         "PYTHONPATH": "/",
         # Config MLflow & MinIO
         "MINIO_HOST": "minio",
@@ -69,12 +68,29 @@ with DAG(
         bash_command='echo "🚀 Démarrage du pipeline Rakuten"'
     )
 
+    init_volume = DockerOperator(
+        task_id='init_volume_permissions',
+        image="spacy:3.7.5",
+        
+        user='root', 
+        
+        # On donne le dossier à l'utilisateur 1000 (trainusr)
+        command="chown -R 1000:1000 /workspace/data",
+        
+        # On monte le volume pour agir dessus
+        mounts=DOCKER_COMMON_ARGS["mounts"],
+        
+        # Pas besoin du réseau ou des variables d'env complexes pour un chown
+        api_version='auto',
+        auto_remove=True,
+        docker_url="unix://var/run/docker.sock",
+    )
     # --- Étape 1 : Récupérer les données (remplace DVC ou mc mirror)
     # On lance le script sync_bucket.py en mode PULL
     # Cela va télécharger le bucket 'raw' vers /workspace/data/raw
     fetch_data_task = DockerOperator(
         task_id='fetch_raw_data',
-        command="python /src/utils/sync_bucket.py raw --mode pull",
+        command="sh -c 'python /src/utils/sync_bucket.py raw --mode pull && python /src/utils/sync_bucket.py dataset --mode pull'",
         **DOCKER_COMMON_ARGS
     ) 
 
@@ -82,7 +98,7 @@ with DAG(
     # Lit data/raw -> Écrit dans data/dataset (ou ailleurs selon votre logique)
     enrich_task = DockerOperator(
         task_id='enrich_dataset',
-        command="python /src/pipeline_steps_df/data/enrich_raw_dataset.py",
+        command="python /src/enrich_raw_dataset.py",
         **DOCKER_COMMON_ARGS
     )
 
@@ -90,7 +106,7 @@ with DAG(
     # Nettoyage, tokenization, préparation pour l'entraînement
     preprocess_task = DockerOperator(
         task_id='preprocessing',
-        command="python /src/pipeline_steps_df/data/preprocessing.py",
+        command="python /src/preprocessing.py",
         **DOCKER_COMMON_ARGS
     )
 
@@ -119,4 +135,4 @@ with DAG(
     # 🔗 ORCHESTRATION
     # =========================================================================
     
-    start >> fetch_data_task >> enrich_task >> preprocess_task >> upload_results_task >> end
+    start >> init_volume >> fetch_data_task >> enrich_task >> preprocess_task >> upload_results_task >> end
