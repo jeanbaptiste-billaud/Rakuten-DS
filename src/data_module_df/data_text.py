@@ -13,7 +13,7 @@ except OSError:
     from spacy.cli import download
     print("📦 Modèle spaCy 'fr_core_news_sm' manquant. Téléchargement en cours...")
     download("fr_core_news_sm")
-    nlp = spacy.load("fr_core_news_sm")
+    nlp = spacy.load("fr_core_news_sm", disable=["ner", "parser"])
 
 
 def preprocess_text(text):
@@ -31,7 +31,7 @@ def preprocess_text(text):
 def preprocess_dataframe(df, text_col="designation_description", batch_size=1000):
     """Prétraitement par lot du texte d’un DataFrame."""
     cleaned_texts = []
-    for doc in nlp.pipe(df[text_col].astype(str), batch_size=batch_size, n_process=-1):
+    for doc in nlp.pipe(df[text_col].astype(str), batch_size=batch_size, n_process=2):
         tokens = [t.lemma_.lower() for t in doc if t.is_alpha and not t.is_stop]
         cleaned_texts.append(" ".join(tokens))
     df["text_cleaned"] = cleaned_texts
