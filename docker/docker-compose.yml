@@ -348,6 +348,10 @@ services:
         - WORKING_DIR=${WORKDIR}
     image: spacy:3.7.5
     container_name: data
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
     user: "1000:1000"
     working_dir: ${WORKDIR}
     environment:
