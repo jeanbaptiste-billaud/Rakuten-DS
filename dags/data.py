@@ -57,7 +57,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id='rakuten_ml_pipeline',
+    dag_id='preprocessing_pipeline',
     default_args=default_args,
     schedule_interval=None, # Déclenchement manuel uniquement
     catchup=False,
