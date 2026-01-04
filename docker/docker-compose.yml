@@ -398,3 +398,5 @@ volumes:
     name: mlflow_db
   minio_data:
     name: minio_data
+  airflow_data:
+    name: airflow_data
