@@ -1,4 +1,4 @@
-ARG VERSION=latest
+ARG VERSION=v3.6.0
 
 FROM ghcr.io/mlflow/mlflow:${VERSION}
 

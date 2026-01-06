@@ -13,5 +13,5 @@ ENV PYTHONPATH="/"
 RUN useradd -m -u 1000 trainusr
 USER trainusr
 
-ARG WORKING_DIR
+ARG WORKING_DIR=/app
 WORKDIR ${WORKING_DIR}

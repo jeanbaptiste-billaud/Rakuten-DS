@@ -8,13 +8,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copie des requirements
-COPY requirements.txt .
+COPY docker/drift-detector/requirements.txt .
 
 # Installation des dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copie du service
-COPY service.py .
+COPY docker/drift-detector/service.py .
 
 # Création du dossier de stockage
 RUN mkdir -p /app/drift_reports

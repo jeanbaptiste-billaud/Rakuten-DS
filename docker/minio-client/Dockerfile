@@ -1,4 +1,4 @@
-ARG VERSION=latest
+ARG VERSION=RELEASE.2025-08-13T08-35-41Z
 FROM minio/mc:${VERSION}
 
 # Create script directory and config directory
