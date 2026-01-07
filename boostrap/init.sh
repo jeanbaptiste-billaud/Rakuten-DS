@@ -8,6 +8,7 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 
 REPO_OWNER="jeanbaptiste-billaud"
 REPO_NAME="Rakuten-DS"
+BRANCH_NAME="data"
 REPO_HTTPS="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
 
 # -----------------------------
@@ -48,7 +49,7 @@ prompt_secret DAGSHUB_PASSWORD "DagsHub token/password (DVC auth basic): "
 echo
 echo "=== Phase 1: DVC (clone + config remote + dvc pull) ==="
 
-docker compose -f "$COMPOSE_FILE" run --rm \
+docker compose -f "${COMPOSE_FILE}" run --rm \
   -e GITHUB_TOKEN="${GITHUB_TOKEN}" \
   -e DAGSHUB_USER="${DAGSHUB_USER}" \
   -e DAGSHUB_PASSWORD="${DAGSHUB_PASSWORD}" \
@@ -56,15 +57,17 @@ docker compose -f "$COMPOSE_FILE" run --rm \
     set -euo pipefail
     cd "$HOME/dvc_data"
 
-    if [[ ! -d "'"$REPO_NAME"'" ]]; then
+    if [[ ! -d "'"${REPO_NAME}"'" ]]; then
       echo "[DVC] Cloning repo (private) ..."
       # Clone avec token via HTTPS
-      git clone "https://${GITHUB_TOKEN}@github.com/'"$REPO_OWNER"'/'"$REPO_NAME"'.git" "'"$REPO_NAME"'"
+      git clone --branch "${BRANCH_NAME}" --single-branch \
+        "https://${GITHUB_TOKEN}@github.com/'"${REPO_OWNER}"'/'"${REPO_NAME}"'.git"
+      "'"${REPO_NAME}"'"
     else
       echo "[DVC] Repo already present, skipping clone."
     fi
 
-    cd "'"$REPO_NAME"'"
+    cd "'"${REPO_NAME}"'"
 
     echo "[DVC] Configuring DVC remote origin (local auth)..."
     dvc remote modify origin --local auth basic
@@ -84,11 +87,11 @@ echo
 echo "=== Phase 2: MinIO (start + bucket population via /src/minio_init.sh) ==="
 
 # 1) Start MinIO and helper client (bucket create etc.)
-docker compose -f "$COMPOSE_FILE" up -d minio-client
+docker compose -f "${COMPOSE_FILE}" up -d minio-client
 
 # 2) Execute your init script INSIDE minio container image (as you requested)
 # We override the command to run the script once and exit.
-docker compose -f "$COMPOSE_FILE" run --rm \
+docker compose -f "${COMPOSE_FILE}" run --rm \
   --entrypoint /bin/sh \
   minio -lc "/src/minio_init.sh"
 

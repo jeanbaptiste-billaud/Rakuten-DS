@@ -21,7 +21,7 @@ def main():
     ).str.strip()
 
     print("🔄 Prétraitement du texte...")
-    df = preprocess_dataframe(df, "designation_description", batch_size=2000)
+    df = preprocess_dataframe(df, "designation_description")
 
     print("💾 Sauvegarde des données prétraitées...")
     processed_path = os.path.join(output_dir, "preprocessed_text.csv")

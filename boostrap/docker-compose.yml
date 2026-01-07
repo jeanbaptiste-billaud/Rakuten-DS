@@ -42,18 +42,26 @@ services:
     volumes:
       - dvc_data:/home/trainusr/dvc_data
       - pgdata:/home/trainusr/pgdata
+      - airflow_volume:/home/trainusr/airflow_volume
+      - logs_and_reports:/home/trainusr/logs_and_reports
 
 networks:
   default:
     name: docker-network
 
 volumes:
+  pgdata:
+    name: pgdata
+    external: false
   minio_data:
     name: minio_data
     external: false
   dvc_data:
     name: dvc_data
     external: false
-  pgdata:
-    name: pgdata
+  airflow_volume:
+    name: airflow_volume
+    external: false
+  logs_and_reports:
+    name: logs_and_reports
     external: false

@@ -1,0 +1,5 @@
+outs:
+- md5: 1e85f4d1b526b4761b1d2f54f257e158
+  size: 159
+  hash: md5
+  path: logs_and_reports.tar.gz
