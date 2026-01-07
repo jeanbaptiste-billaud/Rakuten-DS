@@ -1,0 +1,3 @@
+diff --git a/dockerfiles/mlfow/Dockerfile b/dockerfiles/mlflow/Dockerfile
+rename from dockerfiles/mlfow/Dockerfile
+rename to dockerfiles/mlflow/Dockerfile
