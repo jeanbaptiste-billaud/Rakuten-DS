@@ -1,0 +1,59 @@
+services:
+  minio: # ne pas modifier le nom
+    image: minio/minio:${MINIO_VERSION}
+    container_name: minio-S3-storage
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+      - dvc_data:/mount
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_PORT}/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-client: # ne pas modifier le nom
+    image: jbbillaud/rakuten:minio-client-${MC_VERSION}
+    container_name: minio-client
+    environment:
+      MINIO_MLFLOW_BUCKET: ${MINIO_MLFLOW_BUCKET}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing myminio/${MINIO_MLFLOW_BUCKET}"
+    tty: true
+
+  dvc:
+    image: jbbillaud/rakuten:dvc-v3.64.0
+    container_name: dvc
+    volumes:
+      - dvc_data:/home/trainusr/dvc_data
+      - pgdata:/home/trainusr/pgdata
+
+networks:
+  default:
+    name: docker-network
+
+volumes:
+  minio_data:
+    name: minio_data
+    external: false
+  dvc_data:
+    name: dvc_data
+    external: false
+  pgdata:
+    name: pgdata
+    external: false

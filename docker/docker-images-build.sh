@@ -4,12 +4,16 @@ set -e
 # Dossier où se trouve ce script
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
+set -a
+source "$SCRIPT_DIR/.env"
+set +a
+
 # On remonte d’un niveau (parent de docker/)
 PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 cd "$PROJECT_ROOT"
 
-REPO=helianthus/rakuten
+REPO=jbbillaud/rakuten
 
 build_push () {
   echo "build $2 image and push"
