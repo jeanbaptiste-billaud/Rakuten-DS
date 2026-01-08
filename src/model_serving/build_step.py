@@ -22,6 +22,7 @@ def get_model_uri():
 
 
 model_uri = get_model_uri()
+os.environ["MODEL_URI"]=model_uri
 model_id = model_uri.removeprefix("models:/")
 run_id = os.getenv("MLFLOW_RUN_ID")
 

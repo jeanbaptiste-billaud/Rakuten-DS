@@ -41,7 +41,7 @@ class TextClassifier:
     # On récupère l'objet BentoModel directement
     model_ref = find_model_by_metadata(
         name="rakuten_text_classifier",
-        key="mlflow_run_id",
+        key="mlflow.run_id",
         value=os.getenv("MLFLOW_RUN_ID"),
     )
 
@@ -84,4 +84,12 @@ class TextClassifier:
             "prdtypecode": prdtypecodes,
             "category": categories,
             "n_samples": len(text),
+        }
+
+    @bentoml.api
+    def healthz(self) -> dict:
+        return {
+            "status": "ok",
+            "model_name": self.model_ref.tag.name,
+            "model_version": self.model_ref.tag.version,
         }

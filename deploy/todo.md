@@ -17,5 +17,6 @@
 - implémenter la logique de backup similaire à bootstrap mais via un dag airflow:
   - 1 backup/volume <-- → 1 docker operator task 
 
-<-- 
+- Airflow:
+  - dag bento, redémarrage du docker de service après le push de l'image
 

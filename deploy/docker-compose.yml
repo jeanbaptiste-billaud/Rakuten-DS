@@ -14,7 +14,10 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
-    - airflow_volume:/opt/airflow/
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - logs_and_reports/logs/airflow:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock # indispensable pour exécuter des DockerOperators
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -199,19 +202,24 @@ services:
   # =====================================================================
   # 🟦 MODEL-SERVING (API de prédiction) A finaliser
   # =====================================================================
-#  model-serving:
-#    image: jbbillaud/rakuten:text-model-latest
-#    container_name: model-serving
-#    ports:
-#      - "8002:8002"
-#    volumes:
-#      - ../models:/app/models:ro
-#      - logs_and_reports/logs:/app/logs
-#    environment:
-#      - PYTHONUNBUFFERED=1
-#    restart: unless-stopped
-#    networks:
-#      - default
+  model-serving:
+    image: jbbillaud/rakuten:text-model-latest
+    container_name: model-serving
+    ports:
+      - "${MODEL_PORT}:${MODEL_PORT}"
+    environment:
+      - BENTOML_PORT=${MODEL_PORT}
+      - BENTOML_HOST=${MODEL_HOST}
+    healthcheck:
+      test: ["CMD", "curl -f http://localhost:${MODEL_PORT}/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - logs_and_reports/logs/model-serving:/app/logs
+    restart: unless-stopped
+    networks:
+      - default
 
 #   =====================================================================
 #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
@@ -444,9 +452,6 @@ volumes:
     external: true
   dvc_data:
     name: dvc_data
-    external: true
-  airflow_volume:
-    name: airflow_volume
     external: true
   logs_and_reports:
     name: logs_and_reports
