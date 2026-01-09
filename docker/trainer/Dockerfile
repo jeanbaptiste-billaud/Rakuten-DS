@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 COPY docker/trainer/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y git
 
 RUN mkdir -p /src && touch /src/__init__.py
 COPY src/pipeline_steps_df/training /src
