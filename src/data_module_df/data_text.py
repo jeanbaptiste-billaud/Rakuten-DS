@@ -1,8 +1,9 @@
 # data_text.py
+import spacy
+import pandas as pd
 import json
 import os
-import spacy
-
+from tqdm import tqdm
 from collections import Counter
 
 # Chargement du modèle spaCy français
@@ -32,9 +33,23 @@ def preprocess_dataframe(df, text_col="designation_description", batch_size=1000
     """Prétraitement par lot du texte d’un DataFrame."""
     n_cpu = os.cpu_count()
     cleaned_texts = []
-    for doc in nlp.pipe(df[text_col].astype(str), batch_size=batch_size, n_process=n_cpu/2):
-        tokens = [t.lemma_.lower() for t in doc if t.is_alpha and not t.is_stop]
+
+    total_docs = len(df)
+    print(f"🚀 Démarrage du preprocessing sur {total_docs} lignes...")
+    print(f"⚙️ Pipeline actif : {[pipe for pipe in nlp.pipe_names]}") # Vérification visuelle de ce que spacy charge
+
+    data_stream = nlp.pipe(df[text_col].astype(str),
+                           batch_size=batch_size,
+                           n_process=n_cpu/2)
+
+    for doc in tqdm(data_stream, total=total_docs, desc="spaCy preprocessing"):
+        tokens = [
+            t.lemma_.lower()
+            for t in doc
+            if t.is_alpha and not t.is_stop
+        ]
         cleaned_texts.append(" ".join(tokens))
+
     df["text_cleaned"] = cleaned_texts
     return df
 

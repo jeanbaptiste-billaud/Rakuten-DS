@@ -192,26 +192,54 @@ services:
       - default
 
   # =====================================================================
-  # 🟦 MODEL-SERVING (API de prédiction)
+  # 🛠️ MODEL-BUILDER (API de prédiction)
   # =====================================================================
-  model-serving:
+  model-builder:
     build:
       context: ..
-      dockerfile: docker/model-serving/Dockerfile
-    image: model-serving:latest
-    container_name: model-serving
-    ports:
-      - "8002:8002"
+      dockerfile: docker/bentoml/Dockerfile
+    image: model-builder:latest
+    container_name: model-builder
     volumes:
-      - ../models:/app/models:ro
-      - ../logs:/app/logs
+      - /var/run/docker.sock.raw:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+      - MLFLOW_RUN_ID=1ae0352ce67c41dab8cad9adbc0f656f
     depends_on:
-      - data
-    restart: unless-stopped
+      - mlflow-server
+      - minio
     networks:
       - default
+    command: tail -f /dev/null  # pour garder le conteneur en vie
+    tty: true
+
+
+#  # =====================================================================
+#  # 🟦 MODEL-SERVING (API de prédiction)
+#  # =====================================================================
+#  model-serving:
+#    build:
+#      context: ..
+#      dockerfile: bentoml/Dockerfile
+#    image: model-serving:latest
+#    container_name: model-serving
+#    ports:
+#      - "8002:8002"
+#    volumes:
+#      - ../models:/app/models:ro
+#      - ../logs:/app/logs
+#    environment:
+#      - PYTHONUNBUFFERED=1
+#    depends_on:
+#      - data
+#    restart: unless-stopped
+#    networks:
+#      - default
 
 
   # =====================================================================
@@ -230,7 +258,7 @@ services:
       - MODEL_SERVICE_URL=http://model-serving_provisoire:8002
     depends_on:
       - data
-      - model-serving
+#      - model-serving
     restart: unless-stopped
     networks:
       - default
@@ -269,7 +297,6 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - WORKDIR=${WORKDIR}
     volumes:
       - ../dags:/opt/airflow/dags
       - ../logs/airflow:/opt/airflow/logs
@@ -318,10 +345,10 @@ services:
     container_name: rakuten-model_trainer
     user: "1000:1000"
     working_dir: ${WORKDIR}
-    volumes:
-      - ../src:/src
-      - ../data:/data
-      - ../models:${WORKDIR}/models
+#    volumes:
+#      - ../src:/src
+#      - ../data:/data
+#      - ../models:${WORKDIR}/models
     environment:
       - WORKDIR=${WORKDIR}
       - PYTHONUNBUFFERED=1
@@ -348,10 +375,6 @@ services:
         - WORKING_DIR=${WORKDIR}
     image: spacy:3.7.5
     container_name: data
-    deploy:
-      resources:
-        limits:
-          cpus: '8.0'
     user: "1000:1000"
     working_dir: ${WORKDIR}
     environment:
@@ -375,5 +398,3 @@ volumes:
     name: mlflow_db
   minio_data:
     name: minio_data
-  airflow_data:
-    name: airflow_data
