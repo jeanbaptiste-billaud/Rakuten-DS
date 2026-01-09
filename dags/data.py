@@ -9,12 +9,10 @@ import os
 # 🛠️ CONFIGURATION
 # =============================================================================
 
-# On récupère le chemin actuel (racine du projet dans le conteneur)
-CURRENT_DIR = os.getcwd()
 MINIO_USER = os.getenv("MINIO_ROOT_USER", "minio")
 MINIO_PASS = os.getenv("MINIO_ROOT_PASSWORD", "minio123")
 WORKDIR = os.getenv("WORKDIR", "/workspace")
-DATA_VOLUME = "airflow_data"
+# DATA_VOLUME = "airflow_data"
 # Configuration commune pour éviter de répéter le code dans chaque tâche
 DOCKER_COMMON_ARGS = {
     "image": "spacy:3.7.5",
@@ -25,7 +23,7 @@ DOCKER_COMMON_ARGS = {
     "network_mode": "mlflow-network",
     "working_dir": "/workspace",  # Dossier de travail DANS le conteneur éphémère
     "mounts": [
-        Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
+        # Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
     ],
     "user":"trainusr",
     "environment": {
@@ -68,53 +66,45 @@ with DAG(
         bash_command='echo "🚀 Démarrage du pipeline Rakuten"'
     )
 
-    init_volume = DockerOperator(
-        task_id='init_volume_permissions',
-        image="spacy:3.7.5",
-        
-        user='root', 
-        
-        # On donne le dossier à l'utilisateur 1000 (trainusr)
-        command="chown -R 1000:1000 /workspace/data",
-        
-        # On monte le volume pour agir dessus
-        mounts=DOCKER_COMMON_ARGS["mounts"],
-        
-        # Pas besoin du réseau ou des variables d'env complexes pour un chown
-        api_version='auto',
-        auto_remove=True,
-        docker_url="unix://var/run/docker.sock",
-    )
-    # --- Étape 1 : Récupérer les données (remplace DVC ou mc mirror)
-    # On lance le script sync_bucket.py en mode PULL
-    # Cela va télécharger le bucket 'raw' vers /workspace/data/raw
-    fetch_data_task = DockerOperator(
-        task_id='fetch_raw_data',
-        command="sh -c 'python /src/utils/sync_bucket.py raw --mode pull && python /src/utils/sync_bucket.py dataset --mode pull'",
-        **DOCKER_COMMON_ARGS
-    ) 
-
-    # --- Étape 2 : Enrichissement du dataset ---
-    # Lit data/raw -> Écrit dans data/dataset (ou ailleurs selon votre logique)
+    # --- Étape 1 : Enrichissement ---
+    # Logique :
+    # 1. Pull RAW
+    # 2. Pull DATASET (existant)
+    # 3. Exécuter le script d'enrichissement
+    # 4. Push le résultat dans DATASET
     enrich_task = DockerOperator(
         task_id='enrich_dataset',
-        command="python /src/enrich_raw_dataset.py",
+        command="""sh -c '
+            echo "⬇️ Downloading inputs..." &&
+            python /src/utils/sync_bucket.py raw --mode pull &&
+            python /src/utils/sync_bucket.py dataset --mode pull &&
+            
+            echo "⚙️ Processing Enrich..." &&
+            python /src/enrich_raw_dataset.py &&
+            
+            echo "⬆️ Uploading results..." &&
+            python /src/utils/sync_bucket.py dataset --mode push
+        '""",
         **DOCKER_COMMON_ARGS
     )
 
-    # --- Étape 3 : Preprocessing ---
-    # Nettoyage, tokenization, préparation pour l'entraînement
+    # --- Étape 2 : Preprocessing ---
+    # Logique :
+    # 1. Pull DATASET (celui qui vient d'être mis à jour par l'étape précédente)
+    # 2. Exécuter le preprocessing
+    # 3. Push le résultat dans un NOUVEAU bucket "preprocessed"
     preprocess_task = DockerOperator(
         task_id='preprocessing',
-        command="python /src/preprocessing.py",
-        **DOCKER_COMMON_ARGS
-    )
-
-    # --- Étape 4 : Upload des résultats vers le bucket ---
-    # On envoie /workspace/data/dataset vers le bucket 'dataset'
-    upload_results_task = DockerOperator(
-        task_id='upload_results',
-        command="python /src/utils/sync_bucket.py dataset --mode push",
+        command="""sh -c '
+            echo "⬇️ Downloading inputs..." &&
+            python /src/utils/sync_bucket.py dataset --mode pull &&
+            
+            echo "⚙️ Processing Preprocessing..." &&
+            python /src/preprocessing.py &&
+            
+            echo "⬆️ Uploading results..." &&
+            python /src/utils/sync_bucket.py preprocessed --mode push
+        '""",
         **DOCKER_COMMON_ARGS
     )
 
@@ -127,4 +117,4 @@ with DAG(
     # 🔗 ORCHESTRATION
     # =========================================================================
     
-    start >> init_volume >> fetch_data_task >> enrich_task >> preprocess_task >> upload_results_task >> end
+    start >> enrich_task >> preprocess_task >> end

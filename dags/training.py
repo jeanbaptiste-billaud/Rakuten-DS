@@ -9,12 +9,11 @@ import os
 # 🛠️ CONFIGURATION
 # =============================================================================
 
-# On récupère le chemin actuel (racine du projet dans le conteneur)
-CURRENT_DIR = os.getcwd()
 MINIO_USER = os.getenv("MINIO_ROOT_USER", "minio")
 MINIO_PASS = os.getenv("MINIO_ROOT_PASSWORD", "minio123")
-ML_FLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-DATA_VOLUME = "airflow_data"
+WORKDIR = os.getenv("WORKDIR", "/workspace")
+ML_FLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow-server:5000")
+
 # Configuration commune pour éviter de répéter le code dans chaque tâche
 DOCKER_COMMON_ARGS = {
     "image": "sklearn:v1.7.2",  # Votre image locale
@@ -25,13 +24,14 @@ DOCKER_COMMON_ARGS = {
     "network_mode": "mlflow-network", # Pour parler à MinIO et MLflow
     "working_dir": "/workspace",  # Dossier de travail DANS le conteneur éphémère
     "mounts": [
-        Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
+        # Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
     ],
     "environment": {
         # Indispensable pour que python trouve le module 'src'
+        "WORKDIR": WORKDIR,
         "PYTHONPATH": "/",
         # Config MLflow & MinIO
-        "MINIO_HOST": MINIO_USER,
+        "MINIO_HOST": "minio",
         "MINIO_PORT": "9000",
         "MLFLOW_TRACKING_URI": ML_FLOW_TRACKING_URI,
         "MLFLOW_S3_ENDPOINT_URL": "http://minio:9000",
@@ -63,49 +63,32 @@ with DAG(
 
     start = BashOperator(
         task_id='start_pipeline',
-        bash_command='echo "🚀 Démarrage du pipeline d\'entraînement Rakuten"'
+        bash_command='echo "🚀 Démarrage du pipeline d\'entraînement Stateless"'
     )
 
-    init_volume = DockerOperator(
-        task_id='init_volume_permissions',
-        image="spacy:3.7.5",
-        
-        user='root', 
-        
-        # On donne le dossier à l'utilisateur 1000 (trainusr)
-        command="chown -R 1000:1000 /workspace/data",
-        
-        # On monte le volume pour agir dessus
-        mounts=DOCKER_COMMON_ARGS["mounts"],
-        
-        # Pas besoin du réseau ou des variables d'env complexes pour un chown
-        api_version='auto',
-        auto_remove=True,
-        docker_url="unix://var/run/docker.sock",
-    )
-
-    # --- Étape 1 : Récupérer les données (remplace DVC ou mc mirror)
-    # On lance le script sync_bucket.py en mode PULL
-    # Cela va télécharger le bucket 'raw' vers /workspace/data/raw
-    fetch_data_task = DockerOperator(
-        task_id='fetch_preprocessed_data',
-        command="python /src/utils/sync_bucket.py preprocessed --mode pull",
-        **DOCKER_COMMON_ARGS
-    ) 
-
+    # --- Tâche Unique : Pull Data -> Train -> Log to MLflow ---
+    # On chaîne les commandes pour tout faire dans le même conteneur.
+    # Note : On suppose que train_text_model.py gère l'upload du modèle via mlflow.log_model()
+    # Si vous avez besoin de sauver un fichier spécifique hors MLflow, ajoutez un push à la fin.
     training_task = DockerOperator(
         task_id='train_model',
-        command="python /src/train_text_model.py",
+        command="""sh -c '
+            echo "⬇️ Downloading preprocessed data..." &&
+            python /src/utils/sync_bucket.py preprocessed --mode pull &&
+            
+            echo "🧠 Training model..." &&
+            python /src/train_text_model_with_drift.py
+        '""",
         **DOCKER_COMMON_ARGS
     )
 
     end = BashOperator(
         task_id='end_pipeline',
-        bash_command='echo "✅ Pipeline terminé avec succès"'
+        bash_command='echo "✅ Entraînement terminé - Modèle disponible dans MLflow"'
     )
 
     # =========================================================================
     # 🔗 ORCHESTRATION
     # =========================================================================
 
-    start >> init_volume >> fetch_data_task >> training_task >> end
+    start >> training_task >> end
