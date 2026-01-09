@@ -16,9 +16,10 @@ COPY docker/data/service.py .
 ENV PYTHONPATH="/"
 
 RUN useradd -m -u 1000 trainusr
+ARG WORKING_DIR
+RUN mkdir -p ${WORKING_DIR} && chown -R trainusr:trainusr ${WORKING_DIR}
 USER trainusr
 
-ARG WORKING_DIR
 WORKDIR ${WORKING_DIR}
 
 EXPOSE 8001
