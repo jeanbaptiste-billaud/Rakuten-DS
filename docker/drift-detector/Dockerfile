@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Installation des dépendances système
 RUN apt-get update && apt-get install -y \
-    gcc \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copie des requirements

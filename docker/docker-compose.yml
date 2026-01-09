@@ -146,6 +146,8 @@ services:
     ports:
       - "8003:8003"
     volumes:
+      - ../models:/app/models
+      - ../data:/app/data
       - ../drift_reports:/app/drift_reports
       - ../logs:/app/logs
     restart: unless-stopped

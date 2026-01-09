@@ -4,8 +4,10 @@ Monitore les performances du modèle au fil des réentraînements.
 """
 
 import os
+import httpx
 import json
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
@@ -33,12 +35,38 @@ STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 REFERENCE_PATH = STORAGE_DIR / "reference_data.csv"
 HISTORY_PATH = STORAGE_DIR / "metrics_history.json"
 
+# ========================================
+# MODEL SERVING CONFIG
+# ========================================
+
+MODEL_SERVING_URL = os.getenv(
+    "MODEL_SERVING_URL",
+    "http://model-serving:8002"
+)
+
+# ============================
+# DATA LINEAGE
+# ============================
+
+DATA_DIR = Path("/app/data")
+DATA_LINEAGE_DIR = DATA_DIR / "data_lineage_prediction"
+DATA_LINEAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+PREDICTION_LINEAGE_PATH = DATA_LINEAGE_DIR / "prediction_lineage.csv"
+
+# ============================
+# FASTAPI APP
+# ============================
+
 app = FastAPI(
     title="Rakuten Drift Detector Service",
     description="Service de détection de drift avec Evidently AI",
     version="1.0.0"
 )
 
+# ============================
+# SCHEMAS
+# ============================
 
 class EvaluationData(BaseModel):
     """Données d'évaluation après entraînement."""
@@ -58,6 +86,17 @@ class DriftReport(BaseModel):
     drift_threshold: float
     report_path: str
     run_id: Optional[str] = None
+
+
+# ============================
+# AJOUT — PREDICT SCHEMA
+# ============================
+
+class PredictRequest(BaseModel):
+    """Requête de prédiction en ligne."""
+    text_cleaned: str = Field(
+        ..., description="Texte nettoyé en entrée du modèle"
+    )
 
 
 # ========================================
@@ -88,7 +127,7 @@ def save_metrics_history(eval_data: EvaluationData, drift_report: DriftReport) -
     if HISTORY_PATH.exists():
         with open(HISTORY_PATH, 'r') as f:
             history = json.load(f)
-    
+
     history.append({
         'run_id': eval_data.run_id,
         'timestamp': eval_data.timestamp,
@@ -98,10 +137,41 @@ def save_metrics_history(eval_data: EvaluationData, drift_report: DriftReport) -
         'reference_accuracy': drift_report.reference_accuracy,
         'current_accuracy': drift_report.current_accuracy
     })
-    
+
     with open(HISTORY_PATH, 'w') as f:
         json.dump(history, f, indent=2)
 
+# ========================================
+# AJOUT — DATA LINEAGE
+# ========================================
+
+def save_prediction_lineage(
+    lineage_id: str,
+    timestamp: str,
+    model_version: str,
+    features: Dict,
+    prediction: int,
+    confidence: float
+) -> None:
+    """Sauvegarde une prédiction et son data lineage."""
+
+    row = {
+        "lineage_id": lineage_id,
+        "timestamp": timestamp,
+        "model_version": model_version,
+        "features": json.dumps(features),
+        "prediction": prediction,
+        "confidence": confidence
+    }
+
+    df = pd.DataFrame([row])
+
+    if PREDICTION_LINEAGE_PATH.exists():
+        df.to_csv(PREDICTION_LINEAGE_PATH, mode="a", header=False, index=False)
+    else:
+        df.to_csv(PREDICTION_LINEAGE_PATH, index=False)
+
+    logger.info(f"🧬 Lineage sauvegardé (id={lineage_id})")
 
 # ========================================
 # GÉNÉRATION DE RAPPORTS EVIDENTLY
@@ -113,26 +183,25 @@ def generate_drift_report(
     run_id: str
 ) -> str:
     """Génère un rapport Evidently HTML."""
-    
+
     column_mapping = ColumnMapping(
         target='target',
         prediction='prediction'
     )
-    
+
     report = Report(metrics=[
         ClassificationPreset()
     ])
-    
+
     report.run(
         reference_data=reference_df,
         current_data=current_df,
         column_mapping=column_mapping
     )
-    
-    # Sauvegarde du rapport HTML
+
     report_path = STORAGE_DIR / f"drift_report_{run_id}.html"
     report.save_html(str(report_path))
-    
+
     logger.info(f"📊 Rapport Evidently généré : {report_path}")
     return str(report_path)
 
@@ -557,6 +626,46 @@ async def health_check():
         "storage_dir": str(STORAGE_DIR),
         "reference_exists": REFERENCE_PATH.exists()
     }
+
+@app.post("/predict")
+async def predict(request: PredictRequest):
+
+    lineage_id = str(uuid.uuid4())
+    timestamp = datetime.utcnow().isoformat()
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{MODEL_SERVING_URL}/predict",
+            json={"text_cleaned": request.text_cleaned},
+            timeout=10.0
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="Erreur lors de l'appel au model-serving"
+        )
+
+    result = response.json()
+
+    prediction = result["predicted_class"]
+    confidence = result["confidence"]
+
+    save_prediction_lineage(
+        lineage_id=lineage_id,
+        timestamp=timestamp,
+        model_version="from-model-serving",
+        features={"text_cleaned": request.text_cleaned},
+        prediction=prediction,
+        confidence=confidence
+    )
+
+    return {
+        "prediction": prediction,
+        "confidence": confidence,
+        "lineage_id": lineage_id
+    }
+
 
 
 @app.post("/log-evaluation", response_model=DriftReport)
