@@ -1,10 +1,10 @@
 # data_text.py
-import spacy
-import pandas as pd
 import json
 import os
-from tqdm import tqdm
+import spacy
+
 from collections import Counter
+from tqdm import tqdm
 
 # Chargement du modèle spaCy français
 # Suggestion : Implémenter une fonction de lazy loading pour accélérer les tests
@@ -36,7 +36,7 @@ def preprocess_dataframe(df, text_col="designation_description", batch_size=1000
 
     total_docs = len(df)
     print(f"🚀 Démarrage du preprocessing sur {total_docs} lignes...")
-    print(f"⚙️ Pipeline actif : {[pipe for pipe in nlp.pipe_names]}") # Vérification visuelle de ce que spacy charge
+    print(f"⚙️ Pipeline actif : {[pipe for pipe in nlp.pipe_names]}")  # Vérification visuelle de ce que spacy charge
 
     data_stream = nlp.pipe(df[text_col].astype(str),
                            batch_size=batch_size,

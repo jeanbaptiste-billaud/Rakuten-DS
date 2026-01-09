@@ -59,9 +59,6 @@ volumes:
   dvc_data:
     name: dvc_data
     external: false
-  airflow_volume:
-    name: airflow_volume
-    external: false
   logs_and_reports:
     name: logs_and_reports
     external: false
