@@ -8,7 +8,7 @@ import os
 # Chargement du modèle spaCy français
 # Suggestion : Implémenter une fonction de lazy loading pour accélérer les tests
 try:
-    nlp = spacy.load("fr_core_news_sm")
+    nlp = spacy.load("fr_core_news_sm", disable=["ner", "parser"])
 except OSError:
     from spacy.cli import download
     print("📦 Modèle spaCy 'fr_core_news_sm' manquant. Téléchargement en cours...")
@@ -31,9 +31,29 @@ def preprocess_text(text):
 def preprocess_dataframe(df, text_col="designation_description", batch_size=1000):
     """Prétraitement par lot du texte d’un DataFrame."""
     cleaned_texts = []
-    for doc in nlp.pipe(df[text_col].astype(str), batch_size=batch_size, n_process=2):
-        tokens = [t.lemma_.lower() for t in doc if t.is_alpha and not t.is_stop]
+    
+    total_docs = len(df)
+    print(f"🚀 Démarrage du preprocessing sur {total_docs} lignes...")
+    print(f"⚙️ Pipeline actif : {[pipe for pipe in nlp.pipe_names]}") # Vérification visuelle de ce que spacy charge
+
+    data_stream = nlp.pipe(
+        df[text_col].astype(str), 
+        batch_size=batch_size, 
+        n_process=1
+    )
+
+    for i, doc in enumerate(data_stream):
+        tokens = [
+            t.lemma_.lower() 
+            for t in doc 
+            if t.is_alpha and not t.is_stop
+        ]
         cleaned_texts.append(" ".join(tokens))
+        
+        # LOGGING MANUEL : Affiche un log toutes les 1000 lignes ou à la fin
+        if (i + 1) % 1000 == 0 or (i + 1) == total_docs:
+            print(f"✅ Avancement : {i + 1}/{total_docs} ({(i + 1) / total_docs:.0%})")
+        
     df["text_cleaned"] = cleaned_texts
     return df
 
