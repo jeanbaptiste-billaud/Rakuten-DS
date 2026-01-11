@@ -285,7 +285,7 @@ docker compose exec airflow-webserver airflow tasks test rakuten_ml_pipeline fet
 
 ### MLflow Tracking UI
 
-![*[Insérer capture d'écran de l'interface MLflow montrant les expérimentations et métriques]*](mlflow_experiments.png)
+![*[Insérer capture d'écran de l'interface MLflow montrant les expérimentations et métriques]*](docs/screenshots/mlflow_experiments.png)
 **Emplacement**: `docs/screenshots/mlflow_experiments.png`
 
 Points d'intérêt à capturer : liste des runs, comparaison de métriques (accuracy, F1-score), visualisation des paramètres, artefacts stockés.
@@ -294,7 +294,7 @@ Points d'intérêt à capturer : liste des runs, comparaison de métriques (accu
 
 ### Grafana Dashboard - Model Monitoring
 
-![*[Insérer capture d'écran du dashboard Grafana avec métriques temps réel]*](grafana_dashboard.png)
+![*[Insérer capture d'écran du dashboard Grafana avec métriques temps réel]*](docs/screenshots/grafana_dashboard.png)
 
 **Emplacement**: `docs/screenshots/grafana_dashboard.png`
 
@@ -305,7 +305,7 @@ Points d'intérêt à capturer : total des prédictions, prédictions par minute
 ### Prometheus Metrics
 
 
-![*[Insérer capture d'écran de l'interface Prometheus avec targets et queries]*](prometheus_metrics.png)
+![*[Insérer capture d'écran de l'interface Prometheus avec targets et queries]*](docs/screenshots/prometheus_metrics.png)
 
 **Emplacement**: `docs/screenshots/prometheus_metrics.png`
 
@@ -316,7 +316,7 @@ Points d'intérêt à capturer : status des targets (api-gateway, preprocessing,
 ### Airflow Pipeline DAG
 
 
-![*[Insérer capture d'écran du DAG Airflow en mode Graph]*](airflow_dag_graph.png)
+![*[Insérer capture d'écran du DAG Airflow en mode Graph]*](docs/screenshots/airflow_dag_graph.png)
 
 **Emplacement**: `docs/screenshots/airflow_dag_graph.png`
 
@@ -327,7 +327,7 @@ Points d'intérêt à capturer : graphe complet du DAG `rakuten_ml_pipeline`, é
 ### MinIO Console - Buckets
 
 
-![*[Insérer capture d'écran de l'interface MinIO avec les buckets]*](minio_buckets.png)
+![*[Insérer capture d'écran de l'interface MinIO avec les buckets]*](docs/screenshots/minio_buckets.png)
 
 **Emplacement**: `docs/screenshots/minio_buckets.png`
 
@@ -338,7 +338,7 @@ Points d'intérêt à capturer : liste des buckets (raw, dataset, preprocessed, 
 ### API Gateway Swagger UI
 
 
-![*[Insérer capture d'écran de l'interface Swagger avec endpoints]*](api_swagger.png)
+![*[Insérer capture d'écran de l'interface Swagger avec endpoints]*](docs/screenshots/api_swagger.png)
 
 **Emplacement**: `docs/screenshots/api_swagger.png`
 
@@ -349,7 +349,7 @@ Points d'intérêt à capturer : documentation des endpoints /predict et /health
 ### Drift Detection Report
 
 
-![*[Insérer capture d'écran d'un rapport Evidently de détection de drift]*](drift_report.png)
+![*[Insérer capture d'écran d'un rapport Evidently de détection de drift]*](docs/screenshots/drift_report.png)
 
 **Emplacement**: `docs/screenshots/drift_report.png`
 
