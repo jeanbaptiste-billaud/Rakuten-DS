@@ -17,7 +17,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - logs_and_reports/logs/airflow:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock # indispensable pour exécuter des DockerOperators
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -25,12 +25,13 @@ x-airflow-common:
     postgres:
       condition: service_healthy
 
+
 services:
   # =========================================================
   # 🧠 Base de donnée de Postgres (MLflow + Airflow)
   # =========================================================
   postgres:
-    image: postgres:16
+    image: postgres:15
     container_name: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -67,30 +68,11 @@ services:
       timeout: 3s
       retries: 20
 
-  minio-client: # ne pas modifier le nom
-    image: jbbillaud/rakuten:minio-client-${MC_VERSION:-RELEASE.2025-08-13T08-35-41Z}
-    container_name: minio-client
-    user: "${UID:-1000}:${GID:-1000}"
-    environment:
-      MINIO_MLFLOW_BUCKET: ${MINIO_MLFLOW_BUCKET}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_HOST: ${MINIO_HOST}
-      MINIO_PORT: ${MINIO_PORT}
-    depends_on:
-      minio:
-        condition: service_healthy
-    volumes:
-      - ../data:/mnt/data
-      - ../docker/minio-client/mc-config:/config
-    command: "/src/minio_init.sh > /proc/1/fd/1 2>&1 ; tail -f /dev/null"
-    tty: true
-
   # =========================================================
   # 🧠 MLflow Tracking Server (UI + REST API)
   # =========================================================
   mlflow-server:
-    image: jbbillaud/rakuten-mlflow-${MLFLOW_VERSION:-v3.6.0}
+    image: jbbillaud/rakuten:mlflow-${MLFLOW_VERSION:-v3.6.0}
     container_name: mlflow-server
     env_file:
       - ${ENV_FILE_PATH:-.env}
@@ -125,13 +107,12 @@ services:
   # 🆕 SERVICE DRIFT DETECTOR
   # ========================================
   drift-detector:
-    image: jbbillaud/rakuten-evidently-v0.4.33
+    image: jbbillaud/rakuten:evidently-v0.4.33
     container_name: drift-detector
     ports:
       - "8003:8003"
     volumes:
-      - logs_and_reports/drift_reports:/app/drift_reports
-      - logs_and_reports/logs:/app/logs
+      - logs_and_reports:/app/logs_and_reports
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -145,9 +126,9 @@ services:
   # =====================================================================
   prometheus:
     image: prom/prometheus:latest
-    container_name: rakuten-prometheus
+    container_name: prometheus
     volumes:
-      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     depends_on:
@@ -161,7 +142,7 @@ services:
   # =====================================================================
   grafana:
     image: grafana/grafana:latest
-    container_name: rakuten-grafana
+    container_name: grafana
     ports:
       - "3000:3000"
     environment:
@@ -169,7 +150,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
     networks:
@@ -216,7 +197,10 @@ services:
       timeout: 3s
       retries: 10
     volumes:
-      - logs_and_reports/logs/model-serving:/app/logs
+      - logs_and_reports:/logs_and_reports
+#    command: >
+#      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
+
     restart: unless-stopped
     networks:
       - default

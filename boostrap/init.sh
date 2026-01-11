@@ -43,7 +43,7 @@ prompt() {
 echo "=== Bootstrap init ==="
 
 prompt_secret GITHUB_TOKEN "GitHub token (fine-grained PAT) pour cloner le repo privé: "
-prompt DAGSHUB_USER "DagsHub user" "jeanbaptiste-billaud"
+prompt DAGSHUB_USER "DagsHub user"
 prompt_secret DAGSHUB_PASSWORD "DagsHub token/password (DVC auth basic): "
 
 echo
