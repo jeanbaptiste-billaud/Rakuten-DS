@@ -39,7 +39,7 @@ services:
   dvc:
     image: jbbillaud/rakuten:dvc-v3.66.1
     container_name: dvc
-    user: "${UID}:${GID}"
+    user: "${UID:-1000}:${GID:-1000}"
     working_dir: /data
     volumes:
       - dvc_data:/data/dvc_data
