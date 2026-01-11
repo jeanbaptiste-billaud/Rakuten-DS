@@ -30,3 +30,4 @@ build_push ./docker/minio-client/Dockerfile minio-client-RELEASE.2025-08-13T08-3
 build_push ./docker/mlflow/Dockerfile mlflow-v3.6.0
 build_push ./docker/spacy/Dockerfile spacy-v3.7.5
 build_push ./docker/trainer/Dockerfile sklearn-v1.7.2
+build_push ./docker/streamlit/Dockerfile streamlit-v1.29.0
