@@ -19,8 +19,9 @@ services:
       retries: 20
 
   minio-client: # ne pas modifier le nom
-    image: jbbillaud/rakuten:minio-client-${MC_VERSION}
+    image: jbbillaud/rakuten:minio-client-${MC_VERSION:-RELEASE.2025-08-13T08-35-41Z}
     container_name: minio-client
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       MINIO_MLFLOW_BUCKET: ${MINIO_MLFLOW_BUCKET}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -30,20 +31,20 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-      mc mb --ignore-existing myminio/${MINIO_MLFLOW_BUCKET}"
+    volumes:
+      - dvc_data:/dvc_data
+    command: "/src/minio_init.sh > /proc/1/fd/1 2>&1"
     tty: true
 
   dvc:
-    image: jbbillaud/rakuten:dvc-v3.64.0
+    image: jbbillaud/rakuten:dvc-v3.66.1
     container_name: dvc
+    user: "${UID}:${GID}"
+    working_dir: /data
     volumes:
-      - dvc_data:/home/trainusr/dvc_data
-      - pgdata:/home/trainusr/pgdata
-      - airflow_volume:/home/trainusr/airflow_volume
-      - logs_and_reports:/home/trainusr/logs_and_reports
+      - dvc_data:/data/dvc_data
+      - pgdata:/data/pgdata
+      - logs_and_reports:/data/logs_and_reports
 
 networks:
   default:

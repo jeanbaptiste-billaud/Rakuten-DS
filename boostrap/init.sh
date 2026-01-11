@@ -8,8 +8,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 
 REPO_OWNER="jeanbaptiste-billaud"
 REPO_NAME="Rakuten-DS"
-BRANCH_NAME="data"
-REPO_HTTPS="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+BRANCH_NAME="dvc"
+REPO_HTTPS="github.com/${REPO_OWNER}/${REPO_NAME}.git"
 
 # -----------------------------
 # Helpers
@@ -47,6 +47,10 @@ prompt DAGSHUB_USER "DagsHub user" "jeanbaptiste-billaud"
 prompt_secret DAGSHUB_PASSWORD "DagsHub token/password (DVC auth basic): "
 
 echo
+echo "=== Phase 0: Initialisation des volumes docker ==="
+docker compose run --rm --user 0:0 dvc sh -lc 'chown -R 1000:1000 /data'
+
+echo
 echo "=== Phase 1: DVC (clone + config remote + dvc pull) ==="
 
 docker compose -f "${COMPOSE_FILE}" run --rm \
@@ -55,14 +59,13 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
   -e DAGSHUB_PASSWORD="${DAGSHUB_PASSWORD}" \
   dvc bash -lc '
     set -euo pipefail
-    cd "$HOME/dvc_data"
+    cd "/data/dvc_data"
 
     if [[ ! -d "'"${REPO_NAME}"'" ]]; then
       echo "[DVC] Cloning repo (private) ..."
       # Clone avec token via HTTPS
-      git clone --branch "${BRANCH_NAME}" --single-branch \
-        "https://${GITHUB_TOKEN}@github.com/'"${REPO_OWNER}"'/'"${REPO_NAME}"'.git"
-      "'"${REPO_NAME}"'"
+      git clone --branch '"${BRANCH_NAME}"' --single-branch \
+        "https://"'${GITHUB_TOKEN}'"@'"${REPO_HTTPS}"'"
     else
       echo "[DVC] Repo already present, skipping clone."
     fi
@@ -71,29 +74,26 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
 
     echo "[DVC] Configuring DVC remote origin (local auth)..."
     dvc remote modify origin --local auth basic
-    dvc remote modify origin --local user "${DAGSHUB_USER}"
-    dvc remote modify origin --local password "${DAGSHUB_PASSWORD}"
+    dvc remote modify origin --local user '"${DAGSHUB_USER}"'
+    dvc remote modify origin --local password '"${DAGSHUB_PASSWORD}"'
 
     echo "[DVC] Pulling DVC tracked data..."
-    sed -i "s/\r$//" .dvc/dvc_pull_list.txt
-    grep -vE "^\s*($|#)" .dvc/dvc_pull_list.txt | xargs -d "\n" dvc pull
+    sed -i "s/\r$//" .dvc/dvc_tracking_list.txt
+    grep -vE "^\s*($|#)" .dvc/dvc_tracking_list.txt | xargs -d "\n" dvc pull
 
     echo "[DVC] Done."
 
     echo "postgres db restoration"
-    tar -xzf data/mlflow_db.tar.gz -C "$HOME/pgdata"
+    tar -xzf data/mlflow_db.tar.gz -C "/data/pgdata"
+
+    echo "logs and reports restoration"
+    tar -xzf data/logs_and_reports.tar.gz -C "/data/logs_and_reports"
   '
 echo
 echo "=== Phase 2: MinIO (start + bucket population via /src/minio_init.sh) ==="
+docker compose -f "${COMPOSE_FILE}" run --rm minio-client
 
-# 1) Start MinIO and helper client (bucket create etc.)
-docker compose -f "${COMPOSE_FILE}" up -d minio-client
-
-# 2) Execute your init script INSIDE minio container image (as you requested)
-# We override the command to run the script once and exit.
-docker compose -f "${COMPOSE_FILE}" run --rm \
-  --entrypoint /bin/sh \
-  minio -lc "/src/minio_init.sh"
+docker compose -f "${COMPOSE_FILE}" down
 
 echo
 echo "=== Bootstrap terminé ==="

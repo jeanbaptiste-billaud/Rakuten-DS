@@ -7,7 +7,7 @@ mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MIN
 
 BUCKETS_LIST=("dataset" "preprocessed", ${MINIO_MLFLOW_BUCKET})
 
-DATA_PATH="/mnt/data"
+DATA_PATH='/dvc_data/Rakuten-DS/data'
 
 echo "Début de la synchronisation des buckets MinIO..."
 echo "--------------------------------------------------"

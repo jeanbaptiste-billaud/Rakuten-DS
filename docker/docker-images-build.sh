@@ -2,7 +2,7 @@
 set -e
 
 # Dossier où se trouve ce script
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR="$(pwd -P)"
 
 set -a
 source "$SCRIPT_DIR/.env"

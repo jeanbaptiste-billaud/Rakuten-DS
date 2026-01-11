@@ -3,4 +3,5 @@ uvicorn[standard]==0.30.6
 pydantic==2.9.2
 minio==7.2.18
 prometheus-client==0.20.0
-dvc[all]==3.64.0
+dvc[s3]==3.66.1
+pathspec==0.12.1
