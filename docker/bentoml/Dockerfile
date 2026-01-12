@@ -1,6 +1,7 @@
 FROM docker:29.1.1-cli
 
-WORKDIR /app
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
 
 # Installer python et les dépendances
 RUN apk add --no-cache\

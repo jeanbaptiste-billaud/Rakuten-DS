@@ -40,7 +40,7 @@ def preprocess_dataframe(df, text_col="designation_description", batch_size=1000
 
     data_stream = nlp.pipe(df[text_col].astype(str),
                            batch_size=batch_size,
-                           n_process=n_cpu/2)
+                           n_process=round(n_cpu/2))
 
     for doc in tqdm(data_stream, total=total_docs, desc="spaCy preprocessing"):
         tokens = [

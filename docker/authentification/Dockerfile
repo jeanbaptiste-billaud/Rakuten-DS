@@ -1,7 +1,8 @@
 # docker/authentification/Dockerfile
 FROM python:3.12-slim
 
-WORKDIR /app
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
 
 # Installer les dépendances communes
 COPY docker/authentification/requirements.txt .

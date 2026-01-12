@@ -11,6 +11,11 @@ REPO_NAME="Rakuten-DS"
 BRANCH_NAME="dvc"
 REPO_HTTPS="github.com/${REPO_OWNER}/${REPO_NAME}.git"
 
+SCRIPT_DIR="$(pwd -P)"
+set -a
+source "$SCRIPT_DIR/.env"
+set +a
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -59,7 +64,7 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
   -e DAGSHUB_PASSWORD="${DAGSHUB_PASSWORD}" \
   dvc bash -lc '
     set -euo pipefail
-    cd "/data/dvc_data"
+    cd "'${WORKDIR}'/dvc_data"
 
     if [[ ! -d "'"${REPO_NAME}"'" ]]; then
       echo "[DVC] Cloning repo (private) ..."

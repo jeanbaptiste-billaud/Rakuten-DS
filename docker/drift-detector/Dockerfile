@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
 
 # Installation des dépendances système
 RUN apt-get update && apt-get install -y \

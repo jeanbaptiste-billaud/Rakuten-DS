@@ -13,6 +13,7 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    WORKDIR: ${WORKDIR}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
@@ -20,6 +21,8 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock # indispensable pour exécuter des DockerOperators
   user: "${AIRFLOW_UID:-50000}:0"
+  group_add:
+    - ${AIRFLOW_GID:-1001}
   depends_on:
     &airflow-common-depends-on
     postgres:
@@ -216,29 +219,29 @@ services:
     restart: unless-stopped
     networks:
       - default
-
-  streamlit-dashboard:
-    image: jbbillaud/rakuten:streamlit-v1.29.0
-    container_name: streamlit-dashboard
-    ports:
-      - "8501:8501"
-    volumes:
-      - logs_and_reports:/app/reports:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - mlflow-server
-      - grafana
-      - prometheus
-      - airflow-apiserver
-      - drift-detector
-      - model-serving
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+#
+#  streamlit-dashboard:
+#    image: jbbillaud/rakuten:streamlit-v1.29.0
+#    container_name: streamlit-dashboard
+#    ports:
+#      - "8501:8501"
+#    volumes:
+#      - logs_and_reports:/app/reports:ro
+#    environment:
+#      - PYTHONUNBUFFERED=1
+#    depends_on:
+#      - mlflow-server
+#      - grafana
+#      - prometheus
+#      - airflow-apiserver
+#      - drift-detector
+#      - model-serving
+#    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
 
   # =========================================================
   #  Airflow orchestration
@@ -348,14 +351,14 @@ services:
         echo
         echo "Creating missing opt dirs if missing:"
         echo
-        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
+        mkdir -v -p /opt/airflow/{logs,dags,plugins,config,lineage}
         echo
         echo "Airflow version:"
         /entrypoint airflow version
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config}
+        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
         echo
         echo "Running airflow config list to create default config file if missing."
         echo
@@ -363,7 +366,7 @@ services:
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config}
+        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
         echo
         echo "Change ownership of files in /opt/airflow to ${AIRFLOW_UID}:0"
         echo
@@ -375,7 +378,7 @@ services:
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config}
+        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
 
     # yamllint enable rule:line-length
     environment:
@@ -454,7 +457,7 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: true
+    external: false
   minio_data:
     name: minio_data
     external: true
