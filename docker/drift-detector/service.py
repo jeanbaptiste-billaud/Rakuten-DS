@@ -41,7 +41,7 @@ HISTORY_PATH = STORAGE_DIR / "metrics_history.json"
 
 MODEL_SERVING_URL = os.getenv(
     "MODEL_SERVING_URL",
-    "http://model-serving:8002"
+    "http://model-serving:8002/metrics"
 )
 
 # ============================

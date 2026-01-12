@@ -180,9 +180,9 @@ services:
     command: tail -f /dev/null  # pour garder le conteneur en vie
     tty: true
 
-  # =====================================================================
-  # 🟦 MODEL-SERVING (API de prédiction) A finaliser
-  # =====================================================================
+# =====================================================================
+# 🟦 MODEL-SERVING (API de prédiction)
+# =====================================================================
   model-serving:
     image: jbbillaud/rakuten:text-model-latest
     container_name: model-serving
@@ -191,16 +191,15 @@ services:
     environment:
       - BENTOML_PORT=${MODEL_PORT}
       - BENTOML_HOST=${MODEL_HOST}
+      - MODEL_PATH=/app/models/SVM/model.pkl
+    volumes:
+      - ../models:/app/models
+      - logs_and_reports:/logs_and_reports
     healthcheck:
-      test: ["CMD", "curl -f http://localhost:${MODEL_PORT}/healthz || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MODEL_PORT}/metrics"]
       interval: 10s
       timeout: 3s
       retries: 10
-    volumes:
-      - logs_and_reports:/logs_and_reports
-#    command: >
-#      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
-
     restart: unless-stopped
     networks:
       - default
@@ -268,7 +267,7 @@ services:
     container_name: airflow-apiserver
     command: api-server
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v2/version" ]
       interval: 30s
