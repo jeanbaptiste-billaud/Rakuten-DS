@@ -112,7 +112,7 @@ services:
     ports:
       - "8003:8003"
     volumes:
-      - logs_and_reports:/app/logs_and_reports
+      - logs_and_reports:/app/drift_reports
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -223,8 +223,11 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - logs_and_reports:/app/reports:ro
-      - ./streamlit_config.toml:/root/.streamlit/config.toml:ro
+      - logs_and_reports:/app/reports
+      - ../docker/streamlit/.streamlit:/root/.streamlit          # Config TOML
+      - ../docker/streamlit/app.py:/app/app.py         # Application
+      - ../docker/streamlit/pages:/app/pages
+
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -455,13 +458,13 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: true
+    external: false
   minio_data:
     name: minio_data
-    external: true
+    external: false
   dvc_data:
     name: dvc_data
-    external: true
+    external: false
   logs_and_reports:
     name: logs_and_reports
-    external: true
+    external: false
