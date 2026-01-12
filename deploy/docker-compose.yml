@@ -115,7 +115,8 @@ services:
     ports:
       - "8003:8003"
     volumes:
-      - logs_and_reports:/app/
+      - logs_and_reports:/app/drift_reports/
+      - logs_and_reports:/app/logs/
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -399,23 +400,23 @@ services:
 #  SERVICES à extraire du compose et à appeler via un dag aiflow
 # ===============================================================
 
-  # ========================================
-  # SERVICE TRAINING (avec drift detection)
-  # ========================================
+#   ========================================
+#   SERVICE TRAINING (avec drift detection)
+#   ========================================
 #  trainer:
 #    build:
 #      context: ..
 #      dockerfile: docker/trainer/Dockerfile
 #      args:
 #        - WORKING_DIR=${WORKDIR}
-#    image: sklearn:v1.7.2
+#    image: jbbillaud/rakuten:sklearn-v1.7.2
 #    container_name: rakuten-model_trainer
 #    user: "1000:1000"
 #    working_dir: ${WORKDIR}
-##    volumes:
-##      - ../src:/src
-##      - ../data:/data
-##      - ../models:${WORKDIR}/models
+#    volumes:
+#      - ../src:/src
+#      - ../data:/data
+#      - ../models:${WORKDIR}/models
 #    environment:
 #      - WORKDIR=${WORKDIR}
 #      - PYTHONUNBUFFERED=1
