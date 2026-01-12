@@ -224,6 +224,7 @@ services:
       - "8501:8501"
     volumes:
       - logs_and_reports:/app/reports:ro
+      - ./streamlit_config.toml:/root/.streamlit/config.toml:ro
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
