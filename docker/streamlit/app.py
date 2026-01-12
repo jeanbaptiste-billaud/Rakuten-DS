@@ -1,5 +1,4 @@
 import streamlit as st
-import markdown
 from pathlib import Path
 import requests
 
@@ -21,18 +20,53 @@ if css_path.exists():
 with st.sidebar:
     logo_path = Path("assets/logo.png")
     if logo_path.exists():
-        st.image("assets/logo.png", width=200)
+        st.image("assets/logo.png", width=300)
     st.title("🏭 Rakuten MLOps")
     st.markdown("---")
-    st.info("""
-    **Navigation :**
-    - 🏠 Accueil : Vue d'ensemble
-    - 📊 MLflow : Expérimentation
-    - 📈 Grafana : Monitoring
-    - 🔍 Prometheus : Métriques
-    - ⚙️ Airflow : Pipelines
-    - 🎯 Drift : Détection
-    """)
+
+    
+    st.subheader("🔗 Services")
+    
+    # Liens vers les services
+    st.markdown("🏠 **Accueil** (page actuelle)")
+    st.markdown("---")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("📊")
+    with col2:
+        st.markdown("[MLflow](http://localhost:5000)")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("📈")
+    with col2:
+        st.markdown("[Grafana](http://localhost:3000)")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🔍")
+    with col2:
+        st.markdown("[Prometheus](http://localhost:9090)")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("⚙️")
+    with col2:
+        st.markdown("[Airflow](http://localhost:8080)")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🎯")
+    with col2:
+        st.markdown("[Drift Detector](http://localhost:8003)")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🚀")
+    with col2:
+        st.markdown("[API Gateway](http://localhost:8000/docs)")
+
 
 # Contenu principal
 st.title("🏭 Rakuten MLOps - Dashboard Unifié")
@@ -75,9 +109,8 @@ if readme_path.exists():
     with open(readme_path, 'r', encoding='utf-8') as f:
         readme_content = f.read()
     
-    # Conversion Markdown vers HTML
-    html_content = markdown.markdown(readme_content, extensions=['tables', 'fenced_code'])
-    st.markdown(html_content, unsafe_allow_html=True)
+    # Affichage direct du markdown (Streamlit gère nativement les blocs de code)
+    st.markdown(readme_content)
 else:
     st.error("Documentation non disponible")
 

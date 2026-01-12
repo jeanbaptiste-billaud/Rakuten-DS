@@ -115,7 +115,7 @@ services:
     ports:
       - "8003:8003"
     volumes:
-      - logs_and_reports:/app/logs_and_reports
+      - logs_and_reports:/app/
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -219,29 +219,33 @@ services:
     restart: unless-stopped
     networks:
       - default
-#
-#  streamlit-dashboard:
-#    image: jbbillaud/rakuten:streamlit-v1.29.0
-#    container_name: streamlit-dashboard
-#    ports:
-#      - "8501:8501"
-#    volumes:
-#      - logs_and_reports:/app/reports:ro
-#    environment:
-#      - PYTHONUNBUFFERED=1
-#    depends_on:
-#      - mlflow-server
-#      - grafana
-#      - prometheus
-#      - airflow-apiserver
-#      - drift-detector
-#      - model-serving
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
-#      interval: 30s
-#      timeout: 10s
-#      retries: 3
+
+  streamlit-dashboard:
+    image: jbbillaud/rakuten:streamlit-v1.29.0
+    container_name: streamlit-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - logs_and_reports:/app/reports
+      - ../docker/streamlit/.streamlit:/root/.streamlit          # Config TOML
+      - ../docker/streamlit/app.py:/app/app.py         # Application
+      - ../docker/streamlit/pages:/app/pages
+
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mlflow-server
+      - grafana
+      - prometheus
+      - airflow-apiserver
+      - drift-detector
+      - model-serving
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # =========================================================
   #  Airflow orchestration
@@ -457,7 +461,7 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: false
+    external: true
   minio_data:
     name: minio_data
     external: true
