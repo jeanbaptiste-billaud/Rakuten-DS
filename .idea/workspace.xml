@@ -1,8 +1,90 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.editor&quot;
+  <component name="ChangeListManager">
+    <list default="true" id="69c25bac-11b3-4089-b56e-0a0d1e82623c" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/data/pg_backups.dvc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.dvc/dvc_tracking_list.txt" beforeDir="false" afterPath="$PROJECT_DIR$/.dvc/dvc_tracking_list.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Rakuten-DS-dvc.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Rakuten-DS-dvc.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backup.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/data/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/mlflow_db.tar.gz.dvc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/pg_backups/airflow_db.dump" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/pg_backups/mlflow_db.dump" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "jeanbaptiste-billaud"
   }
-}</component>
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "git@github.com:jeanbaptiste-billaud/Rakuten-DS.git",
+    "accountId": "74cdc19c-883f-419c-a30f-b4f5ef89cfcd"
+  }
+}]]></component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 0
+}]]></component>
+  <component name="ProjectId" id="38D19UYFqVRwp0H9aS8e7MMzht1" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "ai.playground.ignore.import.keys.banner.in.settings": "true",
+    "git-widget-placeholder": "dvc",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "settings.editor.selected.configurable": "configurable.group.editor",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PY-253.29346.308" />
+        <option value="bundled-python-sdk-ca5e2b39c7df-6e1f45a539f7-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.29346.308" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="69c25bac-11b3-4089-b56e-0a0d1e82623c" name="Changes" comment="" />
+      <created>1768319175712</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1768319175712</updated>
+      <workItem from="1768319176813" duration="335000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
 </project>
