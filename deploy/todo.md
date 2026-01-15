@@ -19,4 +19,8 @@
 
 - Airflow:
   - dag bento: redémarrage du docker de service après le push de l'image
+  - training: comparaison nouveau vs ancien → si mieux bento (branchOperator + empty)
+    - Si R2 score (drift) < 5% par rapport précédent, on garde modèle
 
+- script start.sh
+- impression ecran + check prise en compte readme 

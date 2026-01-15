@@ -11,14 +11,14 @@ st.set_page_config(
 )
 
 # CSS personnalisé
-css_path = Path('assets/styles.css')
+css_path = Path('../../docker/streamlit/assets/styles.css')
 if css_path.exists():
     with open(css_path) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    logo_path = Path("assets/logo.png")
+    logo_path = Path("../../docker/streamlit/assets/logo.png")
     if logo_path.exists():
         st.image("assets/logo.png", width=300)
     st.title("🏭 Rakuten MLOps")
@@ -104,7 +104,7 @@ st.markdown("---")
 # Lecture et affichage du README simplifié
 st.header("📖 Documentation")
 
-readme_path = Path("README_simplified.md")
+readme_path = Path("../../docker/streamlit/README_simplified.md")
 if readme_path.exists():
     with open(readme_path, 'r', encoding='utf-8') as f:
         readme_content = f.read()

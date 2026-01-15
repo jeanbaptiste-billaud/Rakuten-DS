@@ -1,8 +1,11 @@
 # src/model_serving/build_step.py
-
+import json
 import os
-import mlflow
+
 import bentoml
+import mlflow
+
+from src.utils.common_utils import get_project_root
 
 
 def get_model_uri():
@@ -21,22 +24,30 @@ def get_model_uri():
     return model_uri
 
 
+ROOT_PATH = os.getenv("WORKDIR", get_project_root())
+
+if not os.getenv("MLFLOW_RUN_ID"):
+    run_id_path = os.path.join(ROOT_PATH, "training_exports", "run_id.json")
+
+    with open(run_id_path, "r") as f:
+        meta = json.load(f)
+    run_id = meta["run_id"]
+    os.environ["MLFLOW_RUN_ID"] = run_id
+
 model_uri = get_model_uri()
-os.environ["MODEL_URI"]=model_uri
+os.environ["MODEL_URI"] = model_uri
 model_id = model_uri.removeprefix("models:/")
-run_id = os.getenv("MLFLOW_RUN_ID")
 
 bento_model = bentoml.mlflow.import_model(
     name=f"rakuten_text_classifier:{run_id}",
     model_uri=model_uri,
-    metadata={"mlflow_uri": model_uri,
-              "model_id": model_uri.removeprefix("models:/"),
-              "mlflow_run_id": run_id,},
+    metadata={
+        "mlflow_uri": model_uri,
+        "mlflow.model_uri": model_uri,
+        "model_id": model_uri.removeprefix("models:/"),
+        "mlflow_run_id": run_id,
+        "mlflow.run_id": run_id,
+    },
 )
 
-
 print("Model registered as Bento:", bento_model)
-
-
-
-

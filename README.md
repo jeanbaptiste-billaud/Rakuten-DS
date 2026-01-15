@@ -24,13 +24,13 @@ L'infrastructure déployée couvre l'ensemble du cycle de vie MLOps : acquisitio
 │                         COUCHE APPLICATION                               │
 │                                                                          │
 │  ┌──────────────────┐                        ┌─────────────────────┐     │
-│  │  API Gateway     │──────────────────────▶│  Model Serving      │     │
+│  │  API Gateway     │ ─────────────────────▶ │  Model Serving      │     │
 │  │  (FastAPI:8000)  │                        │  (BentoML:3001)     │     │
 │  └──────────────────┘                        └─────────────────────┘     │
 │                                                         ▲                │
 │                                                         │                │
 │  ┌──────────────────┐       ┌──────────────────┐        │                │
-│  │  MLflow Server   │◀───▶ │  Model Builder   │────────┘                │
+│  │  MLflow Server   │ ◀───▶ │  Model Builder   │────────┘                │
 │  │  (Tracking)      │       │  (BentoML)       │                         │
 │  └──────────────────┘       └──────────────────┘                         │
 │  ┌──────────────────────────────────────────────────────────────────┐    │

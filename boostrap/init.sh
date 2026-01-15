@@ -89,10 +89,10 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
     echo "[DVC] Done."
 
     echo "postgres db restoration"
-    tar -xzf data/mlflow_db.tar.gz -C "/data/pgdata"
+    tar -xzf data/mlflow_db.tar.gz -C '${WORKDIR}'"
 
     echo "logs and reports restoration"
-    tar -xzf data/logs_and_reports.tar.gz -C "/data/logs_and_reports"
+    tar -xzf data/logs_and_reports.tar.gz -C '${WORKDIR}'"
   '
 echo
 echo "=== Phase 2: MinIO (start + bucket population via /src/minio_init.sh) ==="

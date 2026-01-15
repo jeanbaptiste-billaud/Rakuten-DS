@@ -12,13 +12,13 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /src && touch /src/__init__.py
-COPY src/utils/generate_data_lineage.py /src
+COPY src/utils/generate_data_lineage.py /src/generate_data_lineage.py
 ENV PYTHONPATH="/"
 
 RUN usermod -l trainusr ubuntu #par défaut uid 1000 est attribué au user ubuntu
-USER trainuser
+USER trainusr
 
-ARG WORKDIR=/data
+ARG WORKDIR=/app
 WORKDIR ${WORKDIR}
 
 EXPOSE 8001

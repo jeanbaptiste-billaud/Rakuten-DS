@@ -1,10 +1,9 @@
-import os
-
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sdk import DAG
 from airflow.sdk import timezone
 
 from common_task import start_pipeline_task, end_pipeline_task, preprocess_task, docker_common_args
+
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
@@ -26,6 +25,12 @@ def enrich_task():
             echo "⬆️ Uploading results..." &&
             python /src/utils/sync_bucket.py dataset --mode push
         '""",
+        doc_md="""
+        ### 🐳 Docker task
+        - Lance un conteneur Ubuntu
+        - Affiche `hello`
+        - Sert de test
+        """,
         **common_args
     )
 

@@ -36,7 +36,7 @@ class TextClassifier:
             'mean_confidence': round(probs.max(axis=1).mean(), 4)
         }
 
-        cm = confusion_matrix(y_true, preds).tolist()
+        cm = confusion_matrix(y_true, preds)
         cr = classification_report(y_true, preds, output_dict=True)
 
         return metrics, cm, cr

@@ -11,18 +11,19 @@ from src.data_module_df.data_balancing import Categories
 from src.utils.common_utils import get_project_root
 
 
-def find_model_by_metadata(name: str, key: str, value: str):
+def find_model_by_metadata(name: str, keys: list[str], value: str):
     """
-    Retourne directement l'objet BentoModel correspondant,
-    ou lève une exception si aucun modèle ne correspond.
+    Retourne l'objet BentoModel correspondant en testant plusieurs clés de metadata.
     """
     for m in bentoml.models.list(name):
-        if m.info.metadata.get(key) == value:
+        md = m.info.metadata or {}
+        if any(md.get(k) == value for k in keys):
             return m
     raise RuntimeError(
         f"Aucun modèle BentoML trouvé pour {name} "
-        f"avec metadata[{key}] == {value}"
+        f"avec metadata[{keys}] == {value}"
     )
+
 
 
 demo_image = (
@@ -41,7 +42,7 @@ class TextClassifier:
     # On récupère l'objet BentoModel directement
     model_ref = find_model_by_metadata(
         name="rakuten_text_classifier",
-        key="mlflow.run_id",
+        keys=["mlflow.run_id", "mlflow_run_id", "mlflow_run_id".replace("_", ".")],  # safe
         value=os.getenv("MLFLOW_RUN_ID"),
     )
 
@@ -90,6 +91,34 @@ class TextClassifier:
     def healthz(self) -> dict:
         return {
             "status": "ok",
+            "model_name": self.model_ref.tag.name,
+            "model_version": self.model_ref.tag.version,
+        }
+
+    @bentoml.api
+    def metadata(self) -> dict:
+        md = self.model_ref.info.metadata or {}
+
+        # run_id: priorités -> env, puis metadata (2 conventions)
+        run_id = (
+                os.getenv("MLFLOW_RUN_ID")
+                or md.get("mlflow.run_id")
+                or md.get("mlflow_run_id")
+        )
+
+        model_uri = (
+                os.getenv("MODEL_URI")
+                or md.get("mlflow.model_uri")
+                or md.get("mlflow_uri")  # chez toi, build_step met "mlflow_uri"
+        )
+
+        return {
+            "status": "ok",
+            "service": "TextClassifier",
+            "mlflow_run_id": run_id,
+            "model_uri": model_uri,
+            "model_id": md.get("model_id"),
+            "bento_model_tag": str(self.model_ref.tag),
             "model_name": self.model_ref.tag.name,
             "model_version": self.model_ref.tag.version,
         }

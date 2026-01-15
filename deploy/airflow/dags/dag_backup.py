@@ -1,0 +1,91 @@
+import os
+
+from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.sdk import DAG
+from airflow.sdk import timezone
+from docker.types import Mount
+
+from common_task import start_pipeline_task, end_pipeline_task, volume_backup_task, docker_common_args, pg_dump_task
+
+
+# =============================================================================
+# 🛠️ DÉFINITION DES TASK
+# =============================================================================
+WORKDIR = os.getenv("WORKDIR", "/app")
+
+def minio_backup_task():
+    common_args = docker_common_args()
+    common_args["environment"]["MINIO_MLFLOW_BUCKET"] = os.getenv("MINIO_MLFLOW_BUCKET", "mlflow-artifacts")
+    return DockerOperator(
+        task_id='backup_minio_volume',
+        image="jbbillaud/rakuten:minio-client-RELEASE.2025-08-13T08-35-41Z",
+        mounts=[Mount(source="dvc_data", target="/dvc_data", type="volume")],
+        command="/src/minio_backup.sh > /proc/1/fd/1 2>&1",
+        doc_md="""
+        ### 🐳 Docker task
+        - Lance un conteneur minio-client
+        - Execute le script de sauvegarde des buckets vers dvc_data
+        """,
+        **common_args
+    )
+
+
+def commit_task():
+    common_args = docker_common_args()
+    repo = f"{WORKDIR}/dvc_data/Rakuten-DS"
+    return DockerOperator(
+        task_id='git_dvc_commit',
+        image='jbbillaud/rakuten:dvc-v3.66.1',
+        mounts=[Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume")],
+        command=f"""
+        sh -c "set -e \
+        && cd '{repo}' \
+        && git config --global --add safe.directory '{repo}' \
+        && git config --global user.email 'airflow@local' \
+        && git config --global user.name 'airflow' \
+        && git commit -m 'automatique commit from airflow' || echo 'nothing to commit' \
+        && git push origin dvc \
+        && dvc push"
+        """,
+        doc_md="""
+        ### 🐳 Docker task
+        - commit git
+        - push du commit par git et dvc
+        """,
+        **common_args
+    )
+
+pguser= "{{ conn.postgres_default.login }}"
+pgpwd= "{{ conn.postgres_default.password }}"
+
+# =============================================================================
+# 🚀 DÉFINITION DU DAG
+# =============================================================================
+
+default_args = {
+    'owner': 'rakuten-team',
+    'start_date': timezone.datetime(2025, 1, 1),
+    'retries': 0,  # Pas de retry pour le debug, on veut voir l'erreur tout de suite
+}
+
+with DAG(
+        dag_id='backup_pipeline',
+        default_args=default_args,
+        catchup=False,
+        tags=['mlops', 'rakuten', 'docker']
+) as dag:
+    start = start_pipeline_task()
+
+    backup_mlflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "mlflow_db"), "mlflow", "mlflow")
+    backup_airflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "airflow_db"), "mlflow", "mlflow")
+    backup_logs_and_reports = volume_backup_task("logs_and_reports")
+    backup_minio_volume = minio_backup_task()
+    commit = commit_task()
+
+    end = end_pipeline_task()
+
+    # =========================================================================
+    # 🔗 ORCHESTRATION
+    # =========================================================================
+
+    start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db >> commit >> end

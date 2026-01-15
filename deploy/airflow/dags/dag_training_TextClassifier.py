@@ -1,60 +1,97 @@
-from airflow.sdk import DAG
-from airflow.sdk import timezone
+import os
+import textwrap
+from datetime import datetime
+
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.bash import BashOperator
-from common_task import start_pipeline_task, end_pipeline_task
+from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.sdk import timezone, dag
 from docker.types import Mount
-import os
+
+from common_task import start_pipeline_task, end_pipeline_task, docker_common_args
 
 # =============================================================================
-# 🛠️ CONFIGURATION
+# 🛠️ DÉFINITION DES TASK
 # =============================================================================
-
-MINIO_USER = os.getenv("MINIO_ROOT_USER", "minio")
-MINIO_PASS = os.getenv("MINIO_ROOT_PASSWORD", "minio123")
-WORKDIR = os.getenv("WORKDIR", "/workspace")
-ML_FLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow-server:5000")
-
-# Configuration commune pour éviter de répéter le code dans chaque tâche
-DOCKER_COMMON_ARGS = {
-    "api_version": "auto",
-    "auto_remove": "force",  # Nettoie le conteneur après exécution
-    "network_mode": "mlflow-network",  # Pour parler à MinIO et MLflow
-    # "working_dir": "/workspace",  # Dossier de travail DANS le conteneur éphémère
-    "mounts": [
-        # Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
-    ],
-    "environment": {
-        "WORKDIR": WORKDIR,
-        # Config MLflow & MinIO
-        "MINIO_HOST": "minio",
-        "MINIO_PORT": "9000",
-        "MLFLOW_TRACKING_URI": ML_FLOW_TRACKING_URI,
-        "MLFLOW_S3_ENDPOINT_URL": "http://minio:9000",
-        "MINIO_ACCESS_KEY": MINIO_USER,
-        "MINIO_SECRET_KEY": MINIO_PASS,
-        "AWS_ACCESS_KEY_ID": MINIO_USER,
-        "AWS_SECRET_ACCESS_KEY": MINIO_PASS,
-    }
-}
+WORKDIR = os.getenv("WORKDIR", "/app")
 
 
-# =============================================================================
-#  DÉFINITION DES TASK
-# =============================================================================
+def lineage_task():
+    common_args = docker_common_args()
+    return DockerOperator(
+        task_id="generate_data_lineage_json_file",
+        image="jbbillaud/rakuten:dvc-v3.66.1",
+        mounts=[Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume"),
+                Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        user=f"{os.getenv('AIRFLOW_UID', 5000)}:0",
+        command=[
+            "sh", "-lc", f"""
+            set -e
+            python /src/generate_data_lineage.py \
+              --project-root {WORKDIR}/dvc_data/Rakuten-DS \
+              --rev HEAD \
+              --out {WORKDIR}/lineage/
+            """.strip()
+        ],
+        **common_args
+    )
+
 
 def training_task():
+    common_args = docker_common_args()
+    script = textwrap.dedent(f"""\
+        echo "⬇️ Downloading preprocessed data..."
+        python /src/utils/sync_bucket.py preprocessed --mode pull
+
+        echo "🧠 Training model..."
+        python /src/train_text_model_with_drift.py
+        
+        cp -r /tmp/* {WORKDIR}/training_exports
+    """)
+
     return DockerOperator(
-        task_id='train_model',
+        task_id="train_model",
         image="jbbillaud/rakuten:sklearn-v1.7.2",
-        command="""sh -c '
-            echo "⬇️ Downloading preprocessed data..." &&
-            python /src/utils/sync_bucket.py preprocessed --mode pull &&
-            
-            echo "🧠 Training model..." &&
-            python /src/train_text_model_with_drift.py
-        '""",
-        **DOCKER_COMMON_ARGS
+        mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        command=["sh", "-lc", script],
+        **common_args,
+    )
+
+
+def build_model_task():
+    common_args = docker_common_args()
+    return DockerOperator(
+        task_id="build_model",
+        image="jbbillaud/rakuten:bentoml-v1.4.30",
+        user=f"{os.getenv('AIRFLOW_UID', 5000)}:{os.getenv('DOCKER_GID', 1001)}",
+        command=["sh", "-lc", """
+            set -e
+            . /venv/bin/activate
+            sh /src/model_serving/model_building.sh
+            """],
+        mounts=[Mount(source="/var/run/docker.sock", target="/var/run/docker.sock", type="bind"),
+                Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        **common_args,
+    )
+
+
+def stop_model_task():
+    return BashOperator(
+        task_id="stop_model_serving",
+        bash_command="""
+        set -e
+        docker compose -f /opt/airflow/compose/docker-compose.yml stop model-serving
+        """,
+    )
+
+
+def start_model_task():
+    return BashOperator(
+        task_id="start_model_serving",
+        bash_command="""
+        set -e
+        docker compose -f /opt/airflow/compose/docker-compose.yml up -d model-serving
+        """,
     )
 
 
@@ -68,24 +105,28 @@ default_args = {
     'retries': 0,  # Pas de retry pour le debug, on veut voir l'erreur tout de suite
 }
 
-with DAG(
-        dag_id='training_pipeline',
-        default_args=default_args,
-        catchup=False,
-        tags=['mlops', 'rakuten', 'docker', 'training']
-) as dag:
+
+@dag(
+    dag_id="training_pipeline",
+    default_args=default_args,
+    catchup=False,
+    tags=["mlops", "rakuten", "docker", "training"],
+    start_date=datetime(2024, 1, 1),  # ajuste si tu as déjà un start_date ailleurs
+)
+def training_pipeline_dag():
     start = start_pipeline_task()
 
-    # --- Tâche Unique : Pull Data -> Train -> Log to MLflow ---
-    # On chaîne les commandes pour tout faire dans le même conteneur.
-    # Note : On suppose que train_text_model.py gère l'upload du modèle via mlflow.log_model()
-    # Si vous avez besoin de sauver un fichier spécifique hors MLflow, ajoutez un push à la fin.
-    training_task = training_task()
+    data_lineage = lineage_task()
+    training = training_task()
+
+    stop_model = stop_model_task()
+    build = build_model_task()
+    start_model = start_model_task()
 
     end = end_pipeline_task()
 
-    # =========================================================================
-    # 🔗 ORCHESTRATION
-    # =========================================================================
+    # Orchestration
+    start >> data_lineage >> training >> stop_model >> build >> start_model >> end
 
-    start >> training_task >> end
+
+dag = training_pipeline_dag()

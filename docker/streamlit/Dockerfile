@@ -7,17 +7,18 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-ARG APP_DIR=docker/streamlit
+ARG APP_DIR=deploy/streamlit
+ARG DOCKER_DIR=docker/streamlit
 
 # Installation des packages Python
-COPY ${APP_DIR}/requirements.txt .
+COPY ${DOCKER_DIR}/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copie des fichiers de l'application
 COPY ${APP_DIR}/app.py .
-COPY ${APP_DIR}/pages/ ./pages/
-COPY ${APP_DIR}/assets/ ./assets/
-COPY ${APP_DIR}/README_simplified.md .
+COPY ${APP_DIR}/pages_old/ ./pages/
+COPY ${DOCKER_DIR}/assets/ ./assets/
+COPY ${DOCKER_DIR}/README_simplified.md .
 
 # Configuration Streamlit
 RUN mkdir -p /root/.streamlit

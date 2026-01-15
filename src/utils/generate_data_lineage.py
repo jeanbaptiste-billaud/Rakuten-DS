@@ -55,6 +55,21 @@ def read_dvc_out_hash(dvc_file_rel: str, repo: str, rev: str) -> dict:
     }
 
 
+def resolve_output_path(out: Path, default_name: str = "lineage.json") -> Path:
+    """
+    Si 'out' est un dossier, on écrit <out>/<default_name>.
+    Si 'out' est un fichier, on l'utilise tel quel.
+    """
+    if out.exists() and out.is_dir():
+        return out / default_name
+
+    # heuristique: chemin sans suffixe => dossier implicite
+    if out.suffix == "":
+        return out / default_name
+
+    return out
+
+
 def resolve_to_dvc_file(item: str, project_root: Path) -> str:
     """
     Si 'item' est déjà un .dvc, on le garde.
@@ -151,7 +166,8 @@ def main() -> int:
         "tracking_list": args.tracking_file,
     }
 
-    out = write_json(payload, args.out, indent=args.indent)
+    output_path = resolve_output_path(args.out)
+    out = write_json(payload, output_path, indent=args.indent)
     print(f"✅ Lineage exporté vers: {out.resolve()}")
     return 0
 

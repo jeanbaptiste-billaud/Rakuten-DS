@@ -1,7 +1,4 @@
-FROM docker:29.1.1-cli
-
-ARG WORKDIR=/app
-WORKDIR ${WORKDIR}
+FROM docker:29.1.1-cli-alpine3.22
 
 # Installer python et les dépendances
 RUN apk add --no-cache\
@@ -14,19 +11,31 @@ RUN apk add --no-cache\
     pkgconfig\
     && ln -sf python3 /usr/bin/python
 
-# créer env virtuel
 ENV VIRTUAL_ENV=/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Installer les dépendances
-COPY docker/bentoml/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m spacy download fr_core_news_sm
+# installe dans le venv
+COPY docker/bentoml/requirements.txt .
+RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir -r requirements.txt
+RUN $VIRTUAL_ENV/bin/python -m spacy download fr_core_news_sm
+
+# expose python/pip du venv dans /usr/local/bin (déjà dans PATH minimal)
+RUN ln -sf $VIRTUAL_ENV/bin/python /usr/local/bin/python \
+ && ln -sf $VIRTUAL_ENV/bin/pip /usr/local/bin/pip \
+ && ln -sf $VIRTUAL_ENV/bin/python3 /usr/local/bin/python3
 
 # Copie des utilitaires
-COPY src/data_module_df /app/src/data_module_df
-COPY src/utils /app/src/utils
-COPY src/model_serving /app
+COPY src/data_module_df /src/data_module_df
+COPY src/utils /src/utils
+COPY src/model_serving /src/model_serving
+RUN chmod +x /src/model_serving/model_building.sh
 
-ENV PYTHONPATH="/app"
+RUN addgroup -g 1000 trainusr \
+    && adduser -D -u 1000 -G trainusr -h /home/trainusr trainusr
+USER trainusr
+
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
+
+ENV PYTHONPATH="/"

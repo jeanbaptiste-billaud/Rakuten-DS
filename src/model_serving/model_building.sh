@@ -1,8 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-cd "$SCRIPT_DIR"
 
 # 1) sauvegarde du run_id
 cat <<EOF > provenance.txt
@@ -11,20 +10,27 @@ build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 
 # 2) import du modèle dans le store bentoml à partir du run_id mlflow
+cd "${SCRIPT_DIR}"
 python build_step.py
 
 # 3) Construction d'un bento labellisé à partir du modèle
-BENTO_TAG=$(bentoml build \
+RAW_BENTO_TAG="$(bentoml build \
   --label "mlflow.run_id=${MLFLOW_RUN_ID}" \
   --label "mlflow.model_uri=${MODEL_URI}" \
-  --output tag)
+  --output tag)"
+
+# Retire le préfixe "__tag__:" s'il existe
+BENTO_TAG="${RAW_BENTO_TAG#__tag__:}"
+
+echo "RAW_BENTO_TAG=$RAW_BENTO_TAG"
+echo "BENTO_TAG=$BENTO_TAG"
 
 # 4) containerize avec label Docker + tag image parlant
 docker_repo="jbbillaud/rakuten"
 image_name="text-model"
 docker_tag="${docker_repo}:${image_name}-run-${MLFLOW_RUN_ID}" # ou short/8 chars si tu veux
 
-bentoml containerize "$BENTO_TAG" \
+bentoml containerize "${BENTO_TAG}" \
   -t "$docker_tag" \
   --label "io.mlflow.run_id=${MLFLOW_RUN_ID}" \
   --label "io.mlflow.model_uri=${MODEL_URI}"

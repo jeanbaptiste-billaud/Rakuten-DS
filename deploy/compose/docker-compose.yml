@@ -1,11 +1,12 @@
 x-airflow-common:
   &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.3}
+  image: jbbillaud/rakuten:airflow-v3.1.3
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${AIRFLOW_DB}
+    AIRFLOW_CONN_POSTGRES_DEFAULT: "postgresql://<user>:<password>@postgres:5432/postgres"
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -14,15 +15,18 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     WORKDIR: ${WORKDIR}
+    AIRFLOW_UID: ${AIRFLOW_UID}
+    DOCKER_GID: ${DOCKER_GID}
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-..}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-..}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-..}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-..}/logs:/opt/airflow/logs
+    - ${PROJECT_DIR}/deploy/compose:/opt/airflow/compose
     - /var/run/docker.sock:/var/run/docker.sock # indispensable pour exécuter des DockerOperators
   user: "${AIRFLOW_UID:-50000}:0"
   group_add:
-    - ${AIRFLOW_GID:-1001}
+    - ${DOCKER_GID:-1001}
   depends_on:
     &airflow-common-depends-on
     postgres:
@@ -34,17 +38,17 @@ services:
   # 🧠 Base de donnée de Postgres (MLflow + Airflow)
   # =========================================================
   postgres:
-    image: postgres:15
+    image: postgres:17
     container_name: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: airflow
+      POSTGRES_DB: ${AIRFLOW_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "$AIRFLOW_DB" ]
       interval: 10s
       retries: 5
       start_period: 5s
@@ -66,7 +70,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_PORT}/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_PORT}/minio/health/live" ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -119,7 +123,7 @@ services:
       - logs_and_reports:/app/logs/
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8003/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -132,12 +136,11 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${PROJECT_DIR}/deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     depends_on:
       - mlflow-server
-#      - data
     networks:
       - default
 
@@ -154,7 +157,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ${PROJECT_DIR}/deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
     networks:
@@ -163,26 +166,26 @@ services:
   # =====================================================================
   # 🛠️ MODEL-BUILDER (API de prédiction)
   # =====================================================================
-  model-builder:
-    image: jbbillaud/rakuten:bentoml-v1.4.30
-    container_name: model-builder
-    volumes:
-      - /var/run/docker.sock.raw:/var/run/docker.sock
-    environment:
-      - PYTHONUNBUFFERED=1
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
-      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-      - MLFLOW_RUN_ID=1ae0352ce67c41dab8cad9adbc0f656f
-    depends_on:
-      - mlflow-server
-      - minio
-    networks:
-      - default
-    command: tail -f /dev/null  # pour garder le conteneur en vie
-    tty: true
+  #  model-builder:
+  #    image: jbbillaud/rakuten:bentoml-v1.4.30
+  #    container_name: model-builder
+  #    volumes:
+  #      - /var/run/docker.sock.raw:/var/run/docker.sock
+  #    environment:
+  #      - PYTHONUNBUFFERED=1
+  #      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+  #      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+  #      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+  #      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
+  #      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
+  #      - MLFLOW_RUN_ID=1ae0352ce67c41dab8cad9adbc0f656f
+  #    depends_on:
+  #      - mlflow-server
+  #      - minio
+  #    networks:
+  #      - default
+  #    command: tail -f /dev/null  # pour garder le conteneur en vie
+  #    tty: true
 
   # =====================================================================
   # 🟦 MODEL-SERVING (API de prédiction) A finaliser
@@ -196,22 +199,22 @@ services:
       - BENTOML_PORT=${MODEL_PORT}
       - BENTOML_HOST=${MODEL_HOST}
     healthcheck:
-      test: ["CMD", "curl -f http://localhost:${MODEL_PORT}/healthz || exit 1"]
+      test: [ "CMD", "curl -f http://localhost:${MODEL_PORT}/healthz || exit 1" ]
       interval: 10s
       timeout: 3s
       retries: 10
     volumes:
       - logs_and_reports:/logs_and_reports
-#    command: >
-#      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
+    #    command: >
+    #      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
 
     restart: unless-stopped
     networks:
       - default
 
-#   =====================================================================
-#   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
-#   =====================================================================
+  #   =====================================================================
+  #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
+  #   =====================================================================
   api-gateway:
     image: jbbillaud/rakuten:fastapi-v0.115.0
     container_name: api-gateway
@@ -228,10 +231,9 @@ services:
       - "8501:8501"
     volumes:
       - logs_and_reports:/app/reports
-      - ../docker/streamlit/.streamlit:/root/.streamlit          # Config TOML
-      - ../docker/streamlit/app.py:/app/app.py         # Application
-      - ../docker/streamlit/pages:/app/pages
-
+      - ${PROJECT_DIR}/deploy/streamlit/.streamlit:/root/.streamlit          # Config TOML
+      - ${PROJECT_DIR}/deploy/streamlit/app.py:/app/app.py         # Application
+      - ${PROJECT_DIR}/deploy/streamlit/pages:/app/pages
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -243,7 +245,7 @@ services:
       - model-serving
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -356,14 +358,14 @@ services:
         echo
         echo "Creating missing opt dirs if missing:"
         echo
-        mkdir -v -p /opt/airflow/{logs,dags,plugins,config,lineage}
+        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
         echo
         echo "Airflow version:"
         /entrypoint airflow version
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
+        ls -la /opt/airflow/{logs,dags,plugins,config}
         echo
         echo "Running airflow config list to create default config file if missing."
         echo
@@ -371,7 +373,7 @@ services:
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
+        ls -la /opt/airflow/{logs,dags,plugins,config}
         echo
         echo "Change ownership of files in /opt/airflow to ${AIRFLOW_UID}:0"
         echo
@@ -383,7 +385,7 @@ services:
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config,lineage}
+        ls -la /opt/airflow/{logs,dags,plugins,config}
 
     # yamllint enable rule:line-length
     environment:
@@ -395,7 +397,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
 
-      
+
 # ===============================================================
 #  SERVICES à extraire du compose et à appeler via un dag aiflow
 # ===============================================================
@@ -462,7 +464,7 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: true
+    external: false
   minio_data:
     name: minio_data
     external: true
@@ -472,3 +474,6 @@ volumes:
   logs_and_reports:
     name: logs_and_reports
     external: true
+  airflow_vol:
+    name: airflow_vol
+    external: false
