@@ -14,7 +14,7 @@ def dataset_task():
     common_args = docker_common_args()
     return DockerOperator(
         task_id='create_dataset',
-        image="jbbillaud/rakuten:spacy-v3.7.5",
+        image="jbbillaud/rakuten:spacy-v3.8.11",
         command="""sh -c '
             echo "⬇️ Downloading inputs..." &&
             python /src/utils/sync_bucket.py raw --mode pull &&

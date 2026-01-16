@@ -26,13 +26,16 @@ RUN ln -sf $VIRTUAL_ENV/bin/python /usr/local/bin/python \
  && ln -sf $VIRTUAL_ENV/bin/python3 /usr/local/bin/python3
 
 # Copie des utilitaires
-COPY src/data_module_df /src/data_module_df
-COPY src/utils /src/utils
-COPY src/model_serving /src/model_serving
-RUN chmod +x /src/model_serving/model_building.sh
+COPY src/model_serving /model_serving
+COPY src/data_module_df /model_serving/src/data_module_df
+COPY src/models_module_df /model_serving/src/models_module_df
+COPY src/utils /model_serving/src/utils
+RUN chmod +x /model_serving/model_building.sh
 
 RUN addgroup -g 1000 trainusr \
     && adduser -D -u 1000 -G trainusr -h /home/trainusr trainusr
+
+RUN chown trainusr /model_serving
 USER trainusr
 
 ARG WORKDIR=/app

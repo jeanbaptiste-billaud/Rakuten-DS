@@ -1,17 +1,17 @@
 import os
+from datetime import datetime
 
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.sdk import DAG
-from airflow.sdk import timezone
+from airflow.sdk import timezone, dag
 from docker.types import Mount
 
 from common_task import start_pipeline_task, end_pipeline_task, volume_backup_task, docker_common_args, pg_dump_task
-
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
 # =============================================================================
 WORKDIR = os.getenv("WORKDIR", "/app")
+
 
 def minio_backup_task():
     common_args = docker_common_args()
@@ -55,8 +55,9 @@ def commit_task():
         **common_args
     )
 
-pguser= "{{ conn.postgres_default.login }}"
-pgpwd= "{{ conn.postgres_default.password }}"
+
+pguser = "{{ conn.postgres_default.login }}"
+pgpwd = "{{ conn.postgres_default.password }}"
 
 # =============================================================================
 # 🚀 DÉFINITION DU DAG
@@ -68,12 +69,14 @@ default_args = {
     'retries': 0,  # Pas de retry pour le debug, on veut voir l'erreur tout de suite
 }
 
-with DAG(
-        dag_id='backup_pipeline',
-        default_args=default_args,
-        catchup=False,
-        tags=['mlops', 'rakuten', 'docker']
-) as dag:
+
+@dag(dag_id='backup_pipeline',
+     default_args=default_args,
+     catchup=False,
+     tags=['mlops', 'rakuten', 'docker'],
+     start_date=datetime(2024, 1, 1),
+     )
+def backup_pipeline_dag():
     start = start_pipeline_task()
 
     backup_mlflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "mlflow_db"), "mlflow", "mlflow")
@@ -89,3 +92,6 @@ with DAG(
     # =========================================================================
 
     start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db >> commit >> end
+
+
+dag = backup_pipeline_dag()

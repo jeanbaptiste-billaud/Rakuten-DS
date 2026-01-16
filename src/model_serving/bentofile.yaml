@@ -4,8 +4,14 @@ service: "service:TextClassifier"
 
 include:
   - "src/"
+  - "bentofile.yaml"
   - "bento_requirements.txt"
-  - "provenance.txt"
+  - "service.py"
+  - "bento_model_tag.txt"
+  - "mlflow_run_id.txt"
+
+models:
+  - "__MODEL_TAG__"
 
 python:
   requirements_txt: "bento_requirements.txt"

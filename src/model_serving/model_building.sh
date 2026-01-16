@@ -3,17 +3,17 @@ set -e
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
-# 1) sauvegarde du run_id
-cat <<EOF > provenance.txt
-mlflow_run_id=${MLFLOW_RUN_ID}
-build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-EOF
-
 # 2) import du modèle dans le store bentoml à partir du run_id mlflow
 cd "${SCRIPT_DIR}"
 python build_step.py
 
+. ./.env # charge les variables d'env exportées par le script python
+#echo "MLFLOW_RUN_ID: ${MLFLOW_RUN_ID}"
+
 # 3) Construction d'un bento labellisé à partir du modèle
+MODEL_TAG="$(cat bento_model_tag.txt)"
+sed -i "s|__MODEL_TAG__|${MODEL_TAG}|g" bentofile.yaml # insère le model_tag dans le yaml
+
 RAW_BENTO_TAG="$(bentoml build \
   --label "mlflow.run_id=${MLFLOW_RUN_ID}" \
   --label "mlflow.model_uri=${MODEL_URI}" \

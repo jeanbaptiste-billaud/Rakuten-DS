@@ -17,9 +17,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from evidently import ColumnMapping
-from evidently.metric_preset import ClassificationPreset
-from evidently.report import Report
+from evidently import DataDefinition, Dataset, MulticlassClassification, Report
+from evidently.presets import ClassificationPreset
 
 # Configuration logging
 logging.basicConfig(
@@ -184,23 +183,39 @@ def generate_drift_report(
 ) -> str:
     """Génère un rapport Evidently HTML."""
 
-    column_mapping = ColumnMapping(
-        target='target',
-        prediction='prediction'
+    # Evidently attend des labels (target/prediction) de type string pour le mapping multiclass.
+    # (Cela fonctionne aussi si tes classes sont des entiers côté modèle.)
+    reference_df = reference_df.copy()
+    current_df = current_df.copy()
+    reference_df["target"] = reference_df["target"].astype(str)
+    reference_df["prediction"] = reference_df["prediction"].astype(str)
+    current_df["target"] = current_df["target"].astype(str)
+    current_df["prediction"] = current_df["prediction"].astype(str)
+
+    # Evidently >= 0.7 (nouvelle API):
+    # - ColumnMapping est remplacé par DataDefinition + Dataset
+    # - Report.run(...) renvoie un "snapshot" (my_eval) qui porte save_html()
+    data_definition = DataDefinition(
+        classification=[
+            MulticlassClassification(
+                # On garde tes colonnes actuelles: "target" et "prediction"
+                target="target",
+                prediction_labels="prediction",
+            )
+        ]
     )
 
-    report = Report(metrics=[
+    reference_ds = Dataset.from_pandas(reference_df, data_definition=data_definition)
+    current_ds = Dataset.from_pandas(current_df, data_definition=data_definition)
+
+    report = Report([
         ClassificationPreset()
     ])
 
-    report.run(
-        reference_data=reference_df,
-        current_data=current_df,
-        column_mapping=column_mapping
-    )
+    my_eval = report.run(current_data=current_ds, reference_data=reference_ds)
 
     report_path = STORAGE_DIR / f"drift_report_{run_id}.html"
-    report.save_html(str(report_path))
+    my_eval.save_html(str(report_path))
 
     logger.info(f"📊 Rapport Evidently généré : {report_path}")
     return str(report_path)

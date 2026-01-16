@@ -51,7 +51,7 @@ def training_task():
 
     return DockerOperator(
         task_id="train_model",
-        image="jbbillaud/rakuten:sklearn-v1.7.2",
+        image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
         command=["sh", "-lc", script],
         **common_args,
@@ -62,12 +62,12 @@ def build_model_task():
     common_args = docker_common_args()
     return DockerOperator(
         task_id="build_model",
-        image="jbbillaud/rakuten:bentoml-v1.4.30",
+        image="jbbillaud/rakuten:bentoml-v1.4.33",
         user=f"{os.getenv('AIRFLOW_UID', 5000)}:{os.getenv('DOCKER_GID', 1001)}",
         command=["sh", "-lc", """
             set -e
             . /venv/bin/activate
-            sh /src/model_serving/model_building.sh
+            sh /model_serving/model_building.sh
             """],
         mounts=[Mount(source="/var/run/docker.sock", target="/var/run/docker.sock", type="bind"),
                 Mount(source="airflow_vol", target=WORKDIR, type="volume")],

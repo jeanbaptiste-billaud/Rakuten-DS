@@ -79,7 +79,7 @@ services:
   # 🧠 MLflow Tracking Server (UI + REST API)
   # =========================================================
   mlflow-server:
-    image: jbbillaud/rakuten:mlflow-${MLFLOW_VERSION:-v3.6.0}
+    image: jbbillaud/rakuten:mlflow-${MLFLOW_VERSION:-v3.8.1}
     container_name: mlflow-server
     env_file:
       - ${ENV_FILE_PATH:-.env}
@@ -114,7 +114,7 @@ services:
   # 🆕 SERVICE DRIFT DETECTOR
   # ========================================
   drift-detector:
-    image: jbbillaud/rakuten:evidently-v0.4.33
+    image: jbbillaud/rakuten:evidently-v0.7.20
     container_name: drift-detector
     ports:
       - "8003:8003"
@@ -216,7 +216,7 @@ services:
   #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
   #   =====================================================================
   api-gateway:
-    image: jbbillaud/rakuten:fastapi-v0.115.0
+    image: jbbillaud/rakuten:fastapi-v0.128.0
     container_name: api-gateway
     ports:
       - "8000:8000"
@@ -464,7 +464,7 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: false
+    external: true
   minio_data:
     name: minio_data
     external: true

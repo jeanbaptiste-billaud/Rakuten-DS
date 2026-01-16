@@ -1,5 +1,6 @@
-mlflow==3.6.0
-scikit-learn==1.7.2
-numpy==2.3.4
+fastapi==0.128.0
+scikit-learn==1.8.0
+numpy==2.4.1
 pandas==2.3.3
-spacy==3.8.8
+spacy==3.8.11
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl

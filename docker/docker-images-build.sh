@@ -21,14 +21,14 @@ build_push () {
   echo
 }
 
-build_push ./docker/api-gateway/Dockerfile fastapi-v0.115.0
+build_push ./docker/api-gateway/Dockerfile fastapi-v0.128.0
 build_push ./docker/authentification/Dockerfile authentification
-build_push ./docker/bentoml/Dockerfile bentoml-v1.4.30
-build_push ./docker/drift-detector/Dockerfile evidently-v0.4.33
+build_push ./docker/bentoml/Dockerfile bentoml-v1.4.33
+build_push ./docker/drift-detector/Dockerfile evidently-v0.7.20
 build_push ./docker/dvc/Dockerfile dvc-v3.66.1
 build_push ./docker/minio-client/Dockerfile minio-client-RELEASE.2025-08-13T08-35-41Z
-build_push ./docker/mlflow/Dockerfile mlflow-v3.6.0
-build_push ./docker/spacy/Dockerfile spacy-v3.7.5
-build_push ./docker/trainer/Dockerfile sklearn-v1.7.2
+build_push ./docker/mlflow/Dockerfile mlflow-v3.8.1
+build_push ./docker/spacy/Dockerfile spacy-v3.8.11
+build_push ./docker/trainer/Dockerfile sklearn-v1.8.0
 build_push ./docker/streamlit/Dockerfile streamlit-v1.29.0
 build_push ./docker/airflow/Dockerfile airflow-v3.1.3
