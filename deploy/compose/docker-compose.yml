@@ -216,7 +216,7 @@ services:
   #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
   #   =====================================================================
   api-gateway:
-    image: jbbillaud/rakuten:fastapi-v0.116.0
+    image: jbbillaud/rakuten:fastapi-v0.128.0
     container_name: api-gateway
     ports:
       - "8000:8000"
