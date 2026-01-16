@@ -229,9 +229,7 @@ services:
   # 🔐 AUTH SERVICE (mini-service d'authentification)
   # =========================================================
   auth-service:
-    build:
-      context: ..
-      dockerfile: docker/auth_service/Dockerfile
+    image: jbbillaud/rakuten:authentification
     container_name: auth-service
     networks:
       - default
@@ -240,12 +238,10 @@ services:
   # 🌐 REVERSE PROXY (point d'entrée sécurisé)
   # =========================================================
   reverse-proxy:
-    image: nginx:alpine
+    image: jbbillaud/rakuten:nginx-v3.23
     container_name: reverse-proxy
     ports:
       - "8085:80"
-    volumes:
-      - ./nginx/droits.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - auth-service
       - drift-detector

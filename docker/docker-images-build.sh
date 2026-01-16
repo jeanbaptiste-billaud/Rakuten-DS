@@ -22,7 +22,7 @@ build_push () {
 }
 
 build_push ./docker/api-gateway/Dockerfile fastapi-v0.128.0
-build_push ./docker/authentification/Dockerfile authentification
+build_push ./docker/auth_service/Dockerfile authentification
 build_push ./docker/bentoml/Dockerfile bentoml-v1.4.33
 build_push ./docker/drift-detector/Dockerfile evidently-v0.7.20
 build_push ./docker/dvc/Dockerfile dvc-v3.66.1
@@ -32,3 +32,4 @@ build_push ./docker/spacy/Dockerfile spacy-v3.8.11
 build_push ./docker/trainer/Dockerfile sklearn-v1.8.0
 build_push ./docker/streamlit/Dockerfile streamlit-v1.29.0
 build_push ./docker/airflow/Dockerfile airflow-v3.1.3
+build_push ./docker/reverse-proxy/Dockerfile nginx-v3.23
