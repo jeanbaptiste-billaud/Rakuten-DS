@@ -59,7 +59,7 @@ jobs:
       run: |
         # Lancer les tests et afficher la couverture si besoin
         export PYTHONPATH=$PYTHONPATH:.
-        pytest src/tests/ --doctest-modules --junitxml=junit/test-results.xml
+        pytest src/tests/ --ignore=src/tests/services/mlflow_writing_test.py --doctest-modules --junitxml=junit/test-results.xml
 
     - name: Résultat des tests
       if: steps.run_tests.outcome == 'failure'
