@@ -207,12 +207,10 @@ services:
       retries: 10
     volumes:
       - logs_and_reports:/logs_and_reports
-    #    command: >
-    #      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
-
     restart: unless-stopped
     networks:
       - default
+
 
   #   =====================================================================
   #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
@@ -249,6 +247,7 @@ services:
       - drift-detector
     networks:
       - default
+
 
   streamlit-dashboard:
     image: jbbillaud/rakuten:streamlit-v1.29.0
