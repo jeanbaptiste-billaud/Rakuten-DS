@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y git
 
 RUN mkdir -p /src && touch /src/__init__.py
 COPY src/pipeline_steps_df/training /src
+COPY src/pipeline_steps_df/model_promotion_decision.py /src/model_promotion_decision.py
 COPY src/models_module_df /src/models_module_df
 COPY src/utils /src/utils
 
