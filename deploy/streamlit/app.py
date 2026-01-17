@@ -171,6 +171,104 @@ except Exception as e:
     col3.metric("Entropie (Drift)", "N/A")
     st.warning("⚠️ Impossible de récupérer les métriques Prometheus")
 
+# =========================
+# 🧪 Démo API / Sécurité
+# =========================
+st.markdown("---")
+st.header("🧪 Démo API / Sécurité reverse proxy (via le token d'authentification)")
+
+st.markdown(
+    """
+L'objectif est d'envoyer **la même requête** à l'API `/predict` mais avec **2 tokens différents** :
+- **token = 456** : attendu *OK* (accès admin autorisé) ✅
+- **token = 100** : attendu *KO* (accès refusé) 🚫 → démonstration de la sécurité
+"""
+)
+
+
+api_url = st.text_input("URL de l'endpoint /predict", value="http://reverse-proxy/predict")
+text_cleaned = st.text_input("Valeur de text_cleaned", value="chaussures de sport")
+
+
+def call_predict(url: str, token: str, text_value: str) -> dict:
+    """Appelle /predict en reproduisant le curl (headers + JSON body)."""
+    payload = {"text_cleaned": text_value}
+    headers = {
+        "Content-Type": "application/json",
+        "token": token,  # important: header "token" comme dans ton curl
+    }
+    try:
+        r = requests.post(url, headers=headers, json=payload, timeout=8)
+        content_type = r.headers.get("content-type", "")
+        out = {
+            "status_code": r.status_code,
+            "content_type": content_type,
+            "headers": dict(r.headers),
+            "text": r.text,
+        }
+        # Si c'est du JSON, on tente de parser pour l'afficher proprement
+        if "application/json" in content_type.lower():
+            try:
+                out["json"] = r.json()
+            except Exception:
+                out["json"] = None
+        return out
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)}
+
+
+col_ok, col_ko = st.columns(2)
+
+with col_ok:
+    if st.button("🚀 Predict (token = 456)", type="primary", use_container_width=True):
+        st.session_state["last_predict"] = {
+            "token": "456",
+            "result": call_predict(api_url, "456", text_cleaned),
+        }
+
+with col_ko:
+    if st.button("🔒 Predict (token = 100)", use_container_width=True):
+        st.session_state["last_predict"] = {
+            "token": "100",
+            "result": call_predict(api_url, "100", text_cleaned),
+        }
+
+# Affichage du résultat si disponible
+if "last_predict" in st.session_state:
+    token_used = st.session_state["last_predict"]["token"]
+    res = st.session_state["last_predict"]["result"]
+
+    st.subheader("📨 Requête envoyée")
+
+    curl_cmd = (
+        f"curl -X POST {api_url} \\\n"
+        f"  -H \"Content-Type: application/json\" \\\n"
+        f"  -H \"token: {token_used}\" \\\n"
+        f"  -d '{{\"text_cleaned\":\"{text_cleaned}\"}}'"
+    )
+    st.code(curl_cmd, language="bash")
+
+    st.subheader("📬 Réponse API")
+
+    if "error" in res:
+        st.error(f"Erreur réseau / connexion : {res['error']}")
+    else:
+        code = res["status_code"]
+        if code == 200:
+            st.success(f"✅ HTTP {code} (token={token_used})")
+        else:
+            st.warning(f"⚠️ HTTP {code} (token={token_used})")
+
+        # Affichage du body
+        if res.get("json") is not None:
+            st.json(res["json"])
+        else:
+            st.code(res.get("text", ""), language="text")
+
+        with st.expander("Voir les headers de réponse"):
+            st.json(res.get("headers", {}))
+
+
 # Footer
 st.markdown("---")
 st.markdown("""

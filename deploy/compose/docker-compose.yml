@@ -118,6 +118,8 @@ services:
     container_name: drift-detector
     ports:
       - "8003:8003"
+    environment:
+      - MODEL_SERVING_URL=http://model-serving:8002
     volumes:
       - logs_and_reports:/app/drift_reports/
       - logs_and_reports:/app/logs/
