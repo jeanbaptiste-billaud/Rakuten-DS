@@ -22,7 +22,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-..}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-..}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-..}/logs:/opt/airflow/logs
-    - ${PROJECT_DIR}/deploy/compose:/opt/airflow/compose
+    - .:/opt/airflow/compose
     - /var/run/docker.sock:/var/run/docker.sock # indispensable pour exécuter des DockerOperators
   user: "${AIRFLOW_UID:-50000}:0"
   group_add:
@@ -118,6 +118,8 @@ services:
     container_name: drift-detector
     ports:
       - "8003:8003"
+    environment:
+      - MODEL_SERVING_URL=http://model-serving:8002
     volumes:
       - logs_and_reports:/app/drift_reports/
       - logs_and_reports:/app/logs/
@@ -136,7 +138,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ${PROJECT_DIR}/deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     depends_on:
@@ -157,7 +159,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ${PROJECT_DIR}/deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
     networks:
@@ -198,19 +200,16 @@ services:
     environment:
       - BENTOML_PORT=${MODEL_PORT}
       - BENTOML_HOST=${MODEL_HOST}
-    healthcheck:
-      test: [ "CMD", "curl -f http://localhost:${MODEL_PORT}/healthz || exit 1" ]
-      interval: 10s
-      timeout: 3s
-      retries: 10
+      - MODEL_PATH=/app/models/SVM/model.pkl
     volumes:
+      - ../../models:/app/models:ro
       - logs_and_reports:/logs_and_reports
-    #    command: >
+    #      command: >
     #      ln -sfn /logs_and_reports/logs/model-serving /app/logs/model-serving
-
     restart: unless-stopped
     networks:
       - default
+
 
   #   =====================================================================
   #   🟧 API GATEWAY (point d'entrée – orchestrateur des services)
@@ -242,11 +241,14 @@ services:
     container_name: reverse-proxy
     ports:
       - "8085:80"
+    volumes:
+      - ../../docker/reverse-proxy/droits.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - auth-service
       - drift-detector
     networks:
       - default
+
 
   streamlit-dashboard:
     image: jbbillaud/rakuten:streamlit-v1.29.0
@@ -254,10 +256,9 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - logs_and_reports:/app/reports
-      - ${PROJECT_DIR}/deploy/streamlit/.streamlit:/root/.streamlit          # Config TOML
-      - ${PROJECT_DIR}/deploy/streamlit/app.py:/app/app.py         # Application
-      - ${PROJECT_DIR}/deploy/streamlit/pages:/app/pages
+      - ../streamlit/.streamlit:/root/.streamlit
+      - ../streamlit/app.py:/app/app.py
+      - ../streamlit/pages:/app/pages
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
