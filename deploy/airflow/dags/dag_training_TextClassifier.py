@@ -52,7 +52,7 @@ def training_task():
     """)
 
     return DockerOperator(
-        task_id="train_model",
+        task_id="rakuten_train_model",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
         command=["sh", "-lc", script],
