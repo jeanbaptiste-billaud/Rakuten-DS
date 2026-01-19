@@ -17,9 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copie du service
 COPY docker/drift-detector/service.py .
 
-# Création du dossier de stockage
-RUN mkdir -p ${WORKDIR}/drift_reports
-
 # Exposition du port
 EXPOSE 8003
 

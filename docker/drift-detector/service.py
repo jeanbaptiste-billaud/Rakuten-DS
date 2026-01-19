@@ -28,7 +28,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Chemins de stockage
-STORAGE_DIR = Path("/app/drift_reports")
+WORKDIR = os.path.join(os.getenv("WORKDIR", "/app"), "evidently")
+os.makedirs(WORKDIR, exist_ok=True)
+STORAGE_DIR = Path(os.path.join(WORKDIR, "drift_reports"))
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 REFERENCE_PATH = STORAGE_DIR / "reference_data.csv"
@@ -47,7 +49,7 @@ MODEL_SERVING_URL = os.getenv(
 # DATA LINEAGE
 # ============================
 
-DATA_DIR = Path("/app/data")
+DATA_DIR = Path(os.path.join(WORKDIR, "data"))
 DATA_LINEAGE_DIR = DATA_DIR / "data_lineage_prediction"
 DATA_LINEAGE_DIR.mkdir(parents=True, exist_ok=True)
 

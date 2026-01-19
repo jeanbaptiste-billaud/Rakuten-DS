@@ -41,7 +41,7 @@ def lineage_task():
 
 def training_task():
     common_args = docker_common_args()
-    common_args["environnement"]["DRIFT_DETECTOR_URL"] = os.getenv("DRIFT_DETECTOR_URL")
+    common_args["environment"]["DRIFT_DETECTOR_URL"] = os.getenv("DRIFT_DETECTOR_URL")
     script = textwrap.dedent(f"""\
         echo "⬇️ Downloading preprocessed data..."
         python /src/utils/sync_bucket.py preprocessed --mode pull

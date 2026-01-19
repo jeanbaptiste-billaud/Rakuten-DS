@@ -18,6 +18,10 @@ x-airflow-common:
     AIRFLOW_UID: ${AIRFLOW_UID}
     DOCKER_GID: ${DOCKER_GID}
     DRIFT_DETECTOR_URL: 'http://drift-detector:8003'
+    AIRFLOW__METRICS__STATSD_ON: "True"
+    AIRFLOW__METRICS__STATSD_HOST: "statsd-exporter"
+    AIRFLOW__METRICS__STATSD_PORT: "8125"
+    AIRFLOW__METRICS__STATSD_PREFIX: "airflow"
   volumes:
     - ${AIRFLOW_PROJ_DIR:-..}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-..}/config:/opt/airflow/config
@@ -121,9 +125,9 @@ services:
       - "8003:8003"
     environment:
       - MODEL_SERVING_URL=http://model-serving:8002
+      - WORKDIR=${WORKDIR}
     volumes:
-      - logs_and_reports:/app/drift_reports/
-      - logs_and_reports:/app/logs/
+      - logs_and_reports:/app/evidently
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8003/health" ]
@@ -144,6 +148,22 @@ services:
       - "9090:9090"
     depends_on:
       - mlflow-server
+    networks:
+      - default
+
+
+  # =====================================================================
+  # 🟦 PROMETHEUS (relais airflow (StatsD) - Prometheus)
+  # =====================================================================
+  statsd-exporter:
+    image: prom/statsd-exporter:latest
+    container_name: statsd-exporter
+    ports:
+      - "9102:9102"           # endpoint Prometheus /metrics
+      - "8125:8125/udp"       # réception StatsD depuis Airflow
+    command:
+      - "--statsd.listen-udp=:8125"
+      - "--web.listen-address=:9102"
     networks:
       - default
 
@@ -191,7 +211,7 @@ services:
   #    tty: true
 
   # =====================================================================
-  # 🟦 MODEL-SERVING (API de prédiction) A finaliser
+  # 🟦 MODEL-SERVING (API de prédiction)
   # =====================================================================
   model-serving:
     image: jbbillaud/rakuten:text-model-latest
@@ -225,7 +245,7 @@ services:
     networks:
       - default
 
-      
+
   # =========================================================
   # 🔐 AUTH SERVICE (mini-service d'authentification)
   # =========================================================
@@ -499,7 +519,7 @@ volumes:
     external: true
   logs_and_reports:
     name: logs_and_reports
-    external: true
+    external: false
   airflow_vol:
     name: airflow_vol
     external: false
