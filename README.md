@@ -7,10 +7,10 @@ Pipeline MLOps de production pour la classification automatique de produits Raku
 L'infrastructure déployée couvre l'ensemble du cycle de vie MLOps : acquisition et versioning des données (MinIO + DVC), orchestration des pipelines (Airflow), expérimentation et tracking (MLflow), déploiement de modèles (BentoML), monitoring des performances (Prometheus/Grafana) et détection de dégradation (Evidently).
 
 **Architecture des branches** :
+- `dev` : Branche de développement
+- `main` : Branche principale stable utilisée comme backup et source d'origine des branches 'deploy' et 'data'
 - `deploy` : Branche de déploiement, contient les scripts et configurations pour l'exécution
 - `data` : Branche de données versionnées avec DVC (clonée automatiquement par `init.sh`)
-- `main` : Branche principale stable
-- `dev` : Branche de développement
 
 ## 🏗️ Architecture Logicielle
 

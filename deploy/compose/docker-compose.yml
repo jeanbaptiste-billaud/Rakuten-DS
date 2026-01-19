@@ -17,6 +17,7 @@ x-airflow-common:
     WORKDIR: ${WORKDIR}
     AIRFLOW_UID: ${AIRFLOW_UID}
     DOCKER_GID: ${DOCKER_GID}
+    DRIFT_DETECTOR_URL: 'http://drift-detector:8003'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-..}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-..}/config:/opt/airflow/config
