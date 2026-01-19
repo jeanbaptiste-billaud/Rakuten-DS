@@ -1,6 +1,6 @@
 import os
+import json
 import bentoml
-import numpy as np
 import pandas as pd
 
 from pathlib import Path
@@ -20,7 +20,7 @@ def load_model_ref():
 
 
 def build_metadata_payload() -> dict:
-    # source de vérité: tag du modèle packagé
+    # source de vérité : tag du modèle packagé
     model_tag, model_ref = load_model_ref()
     md = model_ref.info.metadata or {}
 
@@ -45,6 +45,15 @@ def build_metadata_payload() -> dict:
 @api.get("/metadata")
 def metadata_get():
     return JSONResponse(build_metadata_payload())
+
+
+@api.get("/model_perf")
+def model_perf_get():
+    metrics_path = Path("metrics_text.json")
+    with metrics_path.open("r", encoding="utf-8") as f:
+        metrics = json.load(f)
+
+    return JSONResponse(metrics)
 
 
 @bentoml.service(

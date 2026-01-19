@@ -118,58 +118,49 @@ else:
 # Métriques rapides
 st.header("📊 Métriques en Temps Réel")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 # Exemple de récupération de métriques depuis Prometheus
 try:
-    prom_url = "http://prometheus:9090/api/v1/query"
+    perf_rul = "http://model-serving:8002/model_perf"
     
     # Total de prédictions
     response = requests.get(
-        prom_url,
+        perf_rul,
         params={"query": "sum(model_requests_total)"},
         timeout=2
     )
     if response.status_code == 200:
         data = response.json()
-        if data['data']['result']:
-            total_preds = int(float(data['data']['result'][0]['value'][1]))
-            col1.metric("Total Prédictions", f"{total_preds:,}")
+        if data['accuracy']:
+            acc = data['accuracy']
+            col1.metric("Accuracy", f"{acc:,}")
         else:
-            col1.metric("Total Prédictions", "N/A")
-    
-    # Confiance moyenne
-    response = requests.get(
-        prom_url,
-        params={"query": "sum(rate(model_prediction_confidence_sum[5m])) / sum(rate(model_prediction_confidence_count[5m]))"},
-        timeout=2
-    )
-    if response.status_code == 200:
-        data = response.json()
-        if data['data']['result']:
-            avg_conf = float(data['data']['result'][0]['value'][1])
-            col2.metric("Confiance Moyenne", f"{avg_conf:.2%}")
+            col1.metric("Accuracy", "N/A")
+
+        if data['weighted_f1']:
+            wf1 = data['weighted_f1']
+            col2.metric("F1 pondérée", f"{wf1:,}")
         else:
-            col2.metric("Confiance Moyenne", "N/A")
-    
-    # Entropie (drift indicator)
-    response = requests.get(
-        prom_url,
-        params={"query": "model_entropy_last_value"},
-        timeout=2
-    )
-    if response.status_code == 200:
-        data = response.json()
-        if data['data']['result']:
-            entropy = float(data['data']['result'][0]['value'][1])
-            col3.metric("Entropie (Drift)", f"{entropy:.3f}")
+            col2.metric("F1 pondérée", "N/A")
+
+        if data['macro_f1']:
+            mf1 = data['macro_f1']
+            col3.metric("F1 macro", f"{mf1:,}")
         else:
-            col3.metric("Entropie (Drift)", "N/A")
+            col3.metric("F1 macro", "N/A")
+
+        if data['mean_confidence']:
+            conf = data['mean_confidence']
+            col4.metric("Confiance Moyenne", f"{conf:,}")
+        else:
+            col4.metric("Confiance Moyenne", "N/A")
         
 except Exception as e:
-    col1.metric("Total Prédictions", "N/A")
-    col2.metric("Confiance Moyenne", "N/A")
-    col3.metric("Entropie (Drift)", "N/A")
+    col1.metric("Accuracy", "N/A")
+    col2.metric("F1 pondérée", "N/A")
+    col3.metric("F1 macro", "N/A")
+    col4.metric("Confiance Moyenne", "N/A")
     st.warning("⚠️ Impossible de récupérer les métriques Prometheus")
 
 # =========================

@@ -70,6 +70,11 @@ run_id = resolve_run_id(workdir)
 # Récupération du modèle MLflow
 model_uri, model_id = get_model_uri_from_run(run_id)
 
+# Récupération des métriques de performance du modèle
+mlflow.artifacts.download_artifacts(run_id=run_id,
+                                    artifact_path="eval/metrics_text.json",
+                                    dst_path="/model_serving")
+
 # Exports ENV (⚠️ NE PAS SUPPRIMER)
 os.environ["MODEL_URI"] = model_uri
 

@@ -9,6 +9,7 @@ include:
   - "service.py"
   - "bento_model_tag.txt"
   - "mlflow_run_id.txt"
+  - "metrics_text.json"
 
 models:
   - "__MODEL_TAG__"

@@ -1,9 +1,10 @@
 import os
 import logging
 import httpx
+import time
 
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
@@ -11,6 +12,10 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://airflow-apiserver:8080")
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
+
+# --- Airflow token cache (simple, in-memory) ---
+_airflow_token: Optional[str] = None
+_airflow_token_exp: float = 0.0  # epoch seconds
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -80,6 +85,34 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+async def get_airflow_token() -> str:
+    """
+    Récupère un JWT Airflow via /auth/token et le met en cache.
+    On refresh un peu avant expiration pour éviter les edge cases.
+    """
+    global _airflow_token, _airflow_token_exp
+
+    now = time.time()
+    if _airflow_token and now < (_airflow_token_exp - 30):  # marge 30s
+        return _airflow_token
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.post(
+            f"{AIRFLOW_API_URL}/auth/token",
+            json={"username": AIRFLOW_USERNAME, "password": AIRFLOW_PASSWORD},
+        )
+
+    if not (200 <= r.status_code < 300):
+        raise HTTPException(status_code=502, detail=f"Airflow auth/token failed ({r.status_code})")
+
+    data = r.json()
+    # Airflow renvoie typiquement: {"access_token": "...", "token_type": "bearer", "expires_in": 3600}
+    _airflow_token = data["access_token"]
+    expires_in = float(data.get("expires_in", 3600))
+    _airflow_token_exp = now + expires_in
+    return _airflow_token
+
+
 @app.post("/pipelines/{pipeline_name}")
 async def trigger_pipeline(pipeline_name: str):
     endpoint, method = f"/pipelines/{pipeline_name}", "POST"
@@ -96,17 +129,26 @@ async def trigger_pipeline(pipeline_name: str):
     if not dag_id:
         raise HTTPException(status_code=404, detail="Pipeline inconnu")
 
-    dag_run_id = f"api__{pipeline_name}__{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
+    dag_run_id = f"api__{pipeline_name}__{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
-    payload = {"dag_run_id": dag_run_id}
+    logical_date = datetime.now(timezone.utc).isoformat()
+
+    payload = {
+        "dag_run_id": dag_run_id,
+        "logical_date": logical_date,
+        # optionnel si tu veux passer des params
+        # "conf": {}
+    }
+
+    token = await get_airflow_token()
 
     with API_LATENCY.labels(endpoint, method).time():
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
-                    f"{AIRFLOW_API_URL}/api/v2/dags/{dag_id}/dagRuns",
+                    url=f"{AIRFLOW_API_URL}/api/v2/dags/{dag_id}/dagRuns",
                     json=payload,
-                    auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
+                    headers={"Authorization": f"Bearer {token}"},
                 )
 
             if resp.status_code not in (200, 201):
