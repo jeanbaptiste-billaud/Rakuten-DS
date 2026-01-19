@@ -70,7 +70,7 @@ default_args = {
 }
 
 
-@dag(dag_id='backup_pipeline',
+@dag(dag_id='rakuten_backup_pipeline',
      default_args=default_args,
      catchup=False,
      tags=['mlops', 'rakuten', 'docker'],

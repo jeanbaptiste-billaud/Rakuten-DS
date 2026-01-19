@@ -2,10 +2,12 @@ import os
 import textwrap
 from datetime import datetime
 
+import requests
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
-from airflow.sdk import timezone, dag
+from airflow.providers.standard.operators.python import BranchPythonOperator
+from airflow.sdk import timezone, dag, task, task_group
 from docker.types import Mount
 
 from common_task import start_pipeline_task, end_pipeline_task, docker_common_args
@@ -50,7 +52,7 @@ def training_task():
     """)
 
     return DockerOperator(
-        task_id="train_model",
+        task_id="rakuten_train_model",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
         command=["sh", "-lc", script],
@@ -95,38 +97,96 @@ def start_model_task():
     )
 
 
+@task()
+def get_model_run_id_task():
+    response = requests.get("http://model-serving:8002/metadata", timeout=5)
+    response.raise_for_status()
+
+    payload = response.json()
+
+    run_id = payload.get("mlflow_run_id")
+    if not run_id:
+        raise ValueError(f"mlflow_run_id missing in metadata payload: {payload}")
+    else:
+        return run_id
+
+
+def model_comparison_task():
+    common_args = docker_common_args()
+    common_args["environment"]["MODEL_RUN_ID"] = "{{ ti.xcom_pull(task_ids='get_model_run_id_task') }}"
+    return DockerOperator(
+        task_id="model_comparison",
+        image="jbbillaud/rakuten:sklearn-v1.8.0",
+        mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        command=["sh", "-lc", "python /src/model_promotion_decision.py"],
+        do_xcom_push=True,
+        **common_args
+    )
+
+
+def keep_current_model_task():
+    return BashOperator(
+        task_id='keep_current_model',
+        bash_command='echo "Conservation du modèle en cours d''utilisation"'
+    )
+
+
+@task_group(group_id="promote_model")
+def build_new_model_task_gp():
+    stop_model = stop_model_task()
+    build = build_model_task()
+    start_model = start_model_task()
+
+    keep_current_model = keep_current_model_task()
+
+    end = EmptyOperator(
+        task_id="end_model_promote_gp",
+        trigger_rule="none_failed_min_one_success"
+    )
+
+    [keep_current_model, stop_model >> build >> start_model] >> end
+
+
+def branch_on_model_promotion(**context):
+    result = context["ti"].xcom_pull(task_ids="model_comparison")
+
+    # result est une string: "true" ou "false"
+    if result == "true":
+        return "promote_model.stop_model_serving"
+    else:
+        return "promote_model.keep_current_model"
+
+
 # =============================================================================
 # 🚀 DÉFINITION DU DAG
 # =============================================================================
-
-default_args = {
-    'owner': 'rakuten-team',
-    'start_date': timezone.datetime(2025, 1, 1),
-    'retries': 0,  # Pas de retry pour le debug, on veut voir l'erreur tout de suite
-}
-
-
 @dag(
     dag_id="training_pipeline",
-    default_args=default_args,
+    default_args={
+        'owner': 'rakuten-team',
+        'start_date': timezone.datetime(2025, 1, 1),
+        'retries': 0, },
     catchup=False,
     tags=["mlops", "rakuten", "docker", "training"],
     start_date=datetime(2024, 1, 1),  # ajuste si tu as déjà un start_date ailleurs
 )
 def training_pipeline_dag():
     start = start_pipeline_task()
-
     data_lineage = lineage_task()
     training = training_task()
+    get_run_id = get_model_run_id_task()
+    model_comparison = model_comparison_task()
 
-    stop_model = stop_model_task()
-    build = build_model_task()
-    start_model = start_model_task()
+    branch = BranchPythonOperator(
+        task_id="branch_model_decision",
+        python_callable=branch_on_model_promotion,
+    )
 
+    model_promotion = build_new_model_task_gp()
     end = end_pipeline_task()
 
     # Orchestration
-    start >> data_lineage >> training >> stop_model >> build >> start_model >> end
+    start >> data_lineage >> training >> get_run_id >> model_comparison >> branch >> model_promotion >> end
 
 
 dag = training_pipeline_dag()
