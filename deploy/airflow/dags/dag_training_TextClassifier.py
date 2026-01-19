@@ -53,7 +53,7 @@ def training_task():
     """)
 
     return DockerOperator(
-        task_id="rakuten_train_model",
+        task_id="train_model",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
         command=["sh", "-lc", script],
@@ -162,7 +162,7 @@ def branch_on_model_promotion(**context):
 # 🚀 DÉFINITION DU DAG
 # =============================================================================
 @dag(
-    dag_id="training_pipeline",
+    dag_id="rakuten_training_pipeline",
     default_args={
         'owner': 'rakuten-team',
         'start_date': timezone.datetime(2025, 1, 1),

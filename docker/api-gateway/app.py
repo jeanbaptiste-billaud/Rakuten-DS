@@ -80,11 +80,6 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-class TriggerPipelineRequest(BaseModel):
-    conf: Dict[str, Any] = Field(default_factory=dict, description="Paramètres passés au DAG via dag_run.conf")
-    dag_run_id: Optional[str] = Field(default=None, description="Optionnel: identifiant explicite du run")
-
-
 @app.post("/pipelines/{pipeline_name}")
 async def trigger_pipeline(pipeline_name: str):
     endpoint, method = f"/pipelines/{pipeline_name}", "POST"
@@ -109,7 +104,7 @@ async def trigger_pipeline(pipeline_name: str):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
-                    f"{AIRFLOW_API_URL}/api/v1/dags/{dag_id}/dagRuns",
+                    f"{AIRFLOW_API_URL}/api/v2/dags/{dag_id}/dagRuns",
                     json=payload,
                     auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
                 )
@@ -126,3 +121,8 @@ async def trigger_pipeline(pipeline_name: str):
 
         except httpx.RequestError as e:
             raise HTTPException(status_code=502, detail=f"Airflow unreachable: {e}")
+
+
+@app.get("/debug/routes")
+def debug_routes():
+    return [{"path": r.path, "name": r.name} for r in app.routes]

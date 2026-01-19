@@ -72,20 +72,19 @@ class TextClassifier:
         X = df_preprocessed["text_cleaned"].astype(str)
 
         preds = self.model.predict(X)
+        preds_list = preds.tolist() if hasattr(preds, "tolist") else list(preds)
 
         cats = Categories()
-        if isinstance(preds[0], (int, np.integer)) and preds[0] in cats.idx_to_category:
-            prdtypecodes = [cats.idx_to_category[p] for p in preds]
-        else:
-            prdtypecodes = preds.tolist()
 
-        categories = [cats.category_names[code] for code in prdtypecodes]
+        # Ici preds_list contient déjà des prdtypecode
+        prdtypecodes = [int(p) for p in preds_list]
+
+        categories = [cats.category_names.get(c, "UNKNOWN_CATEGORY") for c in prdtypecodes]
 
         return {
             "input": text,
             "prdtypecode": prdtypecodes,
             "category": categories,
-            "n_samples": len(text),
         }
 
     @bentoml.api()

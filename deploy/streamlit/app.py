@@ -9,16 +9,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+workdir = "/app"
 
 # CSS personnalisé
-css_path = Path('../../docker/streamlit/assets/styles.css')
+css_path = Path('/app/assets/styles.css')
 if css_path.exists():
     with open(css_path) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    logo_path = Path("../../docker/streamlit/assets/logo.png")
+    logo_path = Path("/app/assets/logo.png")
     if logo_path.exists():
         st.image("assets/logo.png", width=300)
     st.title("🏭 Rakuten MLOps")
@@ -86,7 +87,7 @@ services = {
     "Grafana": ("http://grafana:3000/api/health", col2),
     "Prometheus": ("http://prometheus:9090/-/healthy", col3),
     "Airflow": ("http://airflow-apiserver:8080/api/v2/version", col4),
-    "Model Serving": ("http://model-serving:3001/healthz", col5)
+    "Model Serving": ("http://model-serving:8002/healthz", col5)
 }
 
 for name, (url, col) in services.items():
@@ -104,7 +105,7 @@ st.markdown("---")
 # Lecture et affichage du README simplifié
 st.header("📖 Documentation")
 
-readme_path = Path("../../docker/streamlit/README_simplified.md")
+readme_path = Path("/app/README_simplified.md")
 if readme_path.exists():
     with open(readme_path, 'r', encoding='utf-8') as f:
         readme_content = f.read()

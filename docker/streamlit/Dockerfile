@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copie des fichiers de l'application
 COPY ${APP_DIR}/app.py .
-COPY ${APP_DIR}/pages_old/ ./pages/
+COPY ${APP_DIR}/pages/ ./pages/
 COPY ${DOCKER_DIR}/assets/ ./assets/
 COPY ${DOCKER_DIR}/README_simplified.md .
 
