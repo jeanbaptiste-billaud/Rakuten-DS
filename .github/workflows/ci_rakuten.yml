@@ -39,9 +39,9 @@ jobs:
           fi
 
           # 2. On installe les dépendances spécifiques aux tests (s'il y en a)
-          if [ -f tests/requirements.txt ]; then 
-            echo "Installation depuis tests/requirements.txt..."
-            pip install -r tests/requirements.txt
+          if [ -f src/tests/requirements.txt ]; then 
+            echo "Installation depuis src/tests/requirements.txt..."
+            pip install -r src/tests/requirements.txt
           fi
 
     # # 4. (Optionnel) Linting - Vérifie la propreté du code

@@ -139,7 +139,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ${PROJECT_DIR}/deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${PROJECT_DIR}/deploy/monitoring:/etc/prometheus
     ports:
       - "9090:9090"
     depends_on:
@@ -258,8 +258,8 @@ services:
     volumes:
       - logs_and_reports:/app/reports
       - ${PROJECT_DIR}/deploy/streamlit/.streamlit:/root/.streamlit          # Config TOML
-      - ${PROJECT_DIR}/deploy/streamlit/app.py:/app/app.py         # Application
-      - ${PROJECT_DIR}/deploy/streamlit/pages:/app/pages
+      - ${PROJECT_DIR}/deploy/streamlit/app.py:/app.py         # Application
+      - ${PROJECT_DIR}/deploy/streamlit/pages:/pages
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
