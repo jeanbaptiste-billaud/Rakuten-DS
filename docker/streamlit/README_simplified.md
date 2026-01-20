@@ -7,13 +7,68 @@ Pipeline MLOps de production pour la classification automatique de produits Raku
 ## 🏗️ Architecture
 
 ```
-API Gateway → Preprocessing → Model Serving
-      ↓              ↓              ↓
-  Prometheus  →  Grafana (Dashboards)
-      ↓
- MLflow (Tracking) → MinIO (S3)
-      ↓
- Airflow (Orchestration)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          COUCHE PRÉSENTATION                            │
+│         Grafana:3000  │  MLflow UI:5000  │  Airflow:8080                │
+└─────────────────────────────────────────────────────────────────────────┘
+                                      │
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         COUCHE APPLICATION                               │
+│                                                                          │
+│  ┌──────────────────┐                        ┌─────────────────────┐     │
+│  │  API Gateway     │ ─────────────────────▶ │  Model Serving      │     │
+│  │  (FastAPI:8000)  │                        │  (BentoML:3001)     │     │
+│  └──────────────────┘                        └─────────────────────┘     │
+│                                                         ▲                │
+│                                                         │                │
+│  ┌──────────────────┐       ┌──────────────────┐        │                │
+│  │  MLflow Server   │ ◀───▶ │  Model Builder   │────────┘                │
+│  │  (Tracking)      │       │  (BentoML)       │                         │
+│  └──────────────────┘       └──────────────────┘                         │
+│  ┌──────────────────────────────────────────────────────────────────┐    │
+│  │  Drift Detector (Evidently:8003)                                 │    │
+│  │  - Analyse post-training (run_id, y_true, y_pred, metrics)       │    │
+│  │  - Comparaison baseline vs run courant                           │    │
+│  │  - Rapports HTML + UI dédiée                                     │    │
+│  │  - Data lineage des prédictions                                  │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+│           ▲                                     │                        │
+│           │ (predict proxy)                     │ (evaluation)           │
+│           └────────────── Model Serving ────────┘                        │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+                                      │
+┌──────────────────────────────────────────────────────────────────────────┐
+│                      COUCHE ORCHESTRATION                                │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐    │
+│  │  Airflow (Scheduler + API Server + DAG Processor)                │    │
+│  │  - Orchestration des pipelines :                                 │    │
+│  │    • Data processing (fetch, enrich, preprocess)                 │    │
+│  │    • Training (entraînement, validation, tracking)               │    │
+│  │    • CI/CD (build, test, deploy)                                 │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+│  ┌──────────────────┐                                                    │
+│  │  DVC Container   │  (Pull/Push données versionnées)                   │
+│  └──────────────────┘                                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+                                      │
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    COUCHE DONNÉES & MONITORING                           │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐    │
+│  │  MinIO S3    │  │  PostgreSQL  │  │  MLflow      │  │ Prometheus │    │
+│  │  (Agrégation │  │  (Metadata)  │  │  (Artifacts) │  │ (Metrics)  │    │
+│  │   données)   │  │  :5432       │  │  S3 backend  │  │ :9090      │    │
+│  │  :9000       │  │              │  │              │  │            │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘    │
+│        ▲                                      ▲                          │
+│        │                                      │                          │
+│        └──────────────────┬───────────────────┘                          │
+│                           │                                              │
+│              Buckets : raw, dataset, preprocessed, mlflow                │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🎯 Composants Principaux

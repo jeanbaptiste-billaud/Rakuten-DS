@@ -26,7 +26,7 @@
       "type": "stat",
       "title": "Total Predictions",
       "gridPos": { "h": 3, "w": 6, "x": 0, "y": 0 },
-      "targets": [{ "expr": "sum(model_requests_total)", "refId": "A" }],
+      "targets": [{ "expr": "sum(bentoml_service_requests_total)", "refId": "A" }],
       "options": {
         "colorMode": "value",
         "reduceOptions": { "calcs": ["lastNotNull"] }
@@ -37,7 +37,7 @@
       "type": "stat",
       "title": "Predictions / minute",
       "gridPos": { "h": 3, "w": 6, "x": 6, "y": 0 },
-      "targets": [{ "expr": "sum(increase(model_requests_total[1m]))", "refId": "A" }],
+      "targets": [{ "expr": "sum(increase(bentoml_service_requests_total[1m]))", "refId": "A" }],
       "options": {
         "colorMode": "background",
         "reduceOptions": { "calcs": ["mean"] },

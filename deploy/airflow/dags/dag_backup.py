@@ -47,40 +47,33 @@ def commit_task():
         
         # Lire la liste de tracking (en supprimant CRLF + vides + commentaires)
         sed -i 's/\\r$//' .dvc/dvc_tracking_list.txt
-        TRACKED_PATHS=$(grep -vE '^\\s*($|#)' .dvc/dvc_tracking_list.txt || true)
+        TRACKED_PATHS=$(grep -vE '^\s*($|#)' .dvc/dvc_tracking_list.txt | sed 's/\.dvc$//' | sort -u || true)
 
-        if [ -z \"$TRACKED_PATHS\" ]; then
+        if [ -z "$TRACKED_PATHS" ]; then
           echo '[DVC] tracking list empty -> nothing to do'
         else
-          echo '[DVC] Updating .dvc pointers via dvc add'
-          # Met à jour les fichiers .dvc (hash) si les contenus ont changé
-          printf '%s\\n' \"$TRACKED_PATHS\" | xargs -d '\\n' -r dvc add
+          echo '[DVC] Updating DVC pointers via dvc add'
+          printf '%s\n' "$TRACKED_PATHS" | xargs -d '\n' -r dvc add
         fi
 
-        # Stage uniquement les fichiers DVC + la liste (si tu veux la versionner)
-        git add -A '*.dvc' .dvc/dvc_tracking_list.txt .gitignore || true
+        # Stage uniquement les fichiers qui ont été modifiés
+        git add -A || true
 
         # Commit/push git seulement si quelque chose a changé
         if git diff --cached --quiet; then
-          echo 'nothing to commit'
+          echo '[GIT] nothing to commit'
         else
           git commit -m 'automatique commit from airflow'
-          git push origin dvc
         fi
         
-        # Push data vers le remote DVC
-        if [ -n \"$TRACKED_PATHS\" ]; then
-          echo '[DVC] Pushing data to remote'
-          dvc push
-        else
-          echo '[DVC] No tracked paths -> skip dvc push'
-        fi
+        git push origin dvc
+        dvc push
         "
         """,
         doc_md="""
         ### 🐳 Docker task
         - lit `.dvc/dvc_tracking_list.txt` (CRLF safe)
-        - met à jour les `.dvc` via `dvc add` si les data ont changé
+        - met à jour les fichiers suivi par dvc via `dvc add` si les datas ont changé
         - commit/push git uniquement si nécessaire
         - push des données via `dvc push`
         """,
@@ -115,16 +108,16 @@ def backup_pipeline_dag():
     backup_airflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "airflow_db"), "mlflow", "mlflow")
     backup_logs_and_reports = volume_backup_task("logs_and_reports")
     backup_minio_volume = minio_backup_task()
-    # commit = commit_task()
+    commit = commit_task()
 
-    # end = end_pipeline_task()
+    end = end_pipeline_task()
 
     # =========================================================================
     # 🔗 ORCHESTRATION
     # =========================================================================
 
-    # start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db >> commit >> end
-    start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db
+    start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db >> commit >> end
+    # start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db
 
 
 dag = backup_pipeline_dag()
