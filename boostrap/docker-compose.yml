@@ -1,4 +1,16 @@
 services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - dvc_data:/dvc_data
+    restart: always
+
   minio: # ne pas modifier le nom
     image: minio/minio:${MINIO_VERSION}
     container_name: minio-S3-storage

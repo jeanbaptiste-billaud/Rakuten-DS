@@ -418,65 +418,6 @@ services:
     user: "0:0"
 
 
-# ===============================================================
-#  SERVICES à extraire du compose et à appeler via un dag aiflow
-# ===============================================================
-
-#   ========================================
-#   SERVICE TRAINING (avec drift detection)
-#   ========================================
-#  trainer:
-#    build:
-#      context: ..
-#      dockerfile: docker/trainer/Dockerfile
-#      args:
-#        - WORKING_DIR=${WORKDIR}
-#    image: jbbillaud/rakuten:sklearn-v1.7.2
-#    container_name: rakuten-model_trainer
-#    user: "1000:1000"
-#    working_dir: ${WORKDIR}
-#    volumes:
-#      - ../src:/src
-#      - ../data:/data
-#      - ../models:${WORKDIR}/models
-#    environment:
-#      - WORKDIR=${WORKDIR}
-#      - PYTHONUNBUFFERED=1
-#      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
-#      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-#      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-#      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-#      - DRIFT_DETECTOR_URL=http://drift-detector:8003
-#      - GIT_PYTHON_REFRESH=quiet
-#    depends_on:
-#      - mlflow-server
-#      - drift-detector
-#    command: tail -f /dev/null  # pour garder le conteneur en vie
-#    tty: true
-#
-#  # ========================================
-#  # SERVICE data (preprocessing etc.)
-#  # ========================================
-#  data:
-#    build:
-#      context: ..
-#      dockerfile: docker/data/Dockerfile
-#      args:
-#        - WORKING_DIR=${WORKDIR}
-#    image: spacy:3.7.5
-#    container_name: data
-#    user: "1000:1000"
-#    working_dir: ${WORKDIR}
-#    environment:
-#      - WORKDIR=${WORKDIR}
-#      - PYTHONUNBUFFERED=1
-#      - MINIO_HOST=${MINIO_HOST}
-#      - MINIO_PORT=${MINIO_PORT}
-#      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-#      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-#    command: tail -f /dev/null  # pour garder le conteneur en vie
-#    tty: true
-
 networks:
   default:
     name: mlflow-network
@@ -484,16 +425,16 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: false
+    external: true
   minio_data:
     name: minio_data
     external: true
   dvc_data:
     name: dvc_data
-    external: false
+    external: true
   logs_and_reports:
     name: logs_and_reports
-    external: false
+    external: true
   airflow_vol:
     name: airflow_vol
-    external: false
+    external: true

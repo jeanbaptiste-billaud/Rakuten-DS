@@ -53,7 +53,7 @@ prompt_secret DAGSHUB_PASSWORD "DagsHub token/password (DVC auth basic): "
 
 echo
 echo "=== Phase 0: Initialisation des volumes docker ==="
-docker compose run --rm --user 0:0 dvc sh -lc 'chown -R 1000:1000 /data'
+docker compose run --rm --user 0:0 dvc sh -lc "chown -R ${HOST_UID}:${HOST_GID} ${WORKDIR}"
 
 echo
 echo "=== Phase 1: DVC (clone + config remote + dvc pull) ==="
@@ -88,14 +88,38 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
 
     echo "[DVC] Done."
 
-    echo "postgres db restoration"
-    tar -xzf data/mlflow_db.tar.gz -C '${WORKDIR}'"
-
     echo "logs and reports restoration"
-    tar -xzf data/logs_and_reports.tar.gz -C '${WORKDIR}'"
+    tar -xzf data/logs_and_reports.tar.gz -C '${WORKDIR}'
   '
 echo
-echo "=== Phase 2: MinIO (start + bucket population via /src/minio_init.sh) ==="
+echo "=== Phase 2: Restauration des bases de données de mlflow et airflow"
+docker compose -f "${COMPOSE_FILE}" up -d postgres
+# Transformer la liste en array
+IFS=',' read -r -a DB_LIST_ARRAY <<< "${DB_LIST}"
+
+for DB in "${DB_LIST_ARRAY[@]}"; do
+  DB="$(echo "$DB" | xargs)"   # trim espaces
+  DUMP_PATH="${DB_BACKUP_DIR}/${DB}.dump"
+
+  echo "🔄 Restauration ${DB}"
+
+  docker compose exec -T \
+    -e PGPASSWORD="${POSTGRES_PASSWORD}" \
+    postgres \
+    pg_restore -U "${POSTGRES_USER}" -d postgres \
+      --create --clean --if-exists \
+      --no-owner --no-privileges \
+      "${DUMP_PATH}"
+
+  docker compose exec -T postgres bash -lc \
+    "psql -U \"${POSTGRES_USER}\" -d postgres -tAc \"SELECT 1 FROM pg_database WHERE datname = '${DB}';\" | grep -q '^1$'"
+
+  echo "✅ ${DB} OK"
+done
+docker compose -f "${COMPOSE_FILE}" down
+
+echo
+echo "=== Phase 3: MinIO (start + bucket population via /src/minio_init.sh) ==="
 docker compose -f "${COMPOSE_FILE}" run --rm minio-client
 
 docker compose -f "${COMPOSE_FILE}" down
