@@ -1,23 +1,26 @@
 #!/bin/sh
+set -euo pipefail
 
-# Désactive l'arrêt sur erreur
+export MC_CONFIG_DIR=/tmp/.mc
+rm -rf "$MC_CONFIG_DIR"
+mkdir -p "$MC_CONFIG_DIR"
+
 set +e
 
 echo "🔗 Configuration de l'alias MinIO..."
 mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
 
 echo "🪣 Création du bucket raw et import du csv..."
+DATA_PATH='/dvc_data/Rakuten-DS/data'
 mc mb --ignore-existing myminio/raw
-if [ -f /mnt/data/raw/all_raw_data.csv ]; then
-    mc cp /mnt/data/raw/all_raw_data.csv myminio/raw/all_raw_data.csv
+if [ -f ${DATA_PATH}/raw/all_raw_data.csv ]; then
+    mc cp ${DATA_PATH}/raw/all_raw_data.csv myminio/raw/all_raw_data.csv
 fi
 
 # Liste des buckets à créer / synchroniser
 BUCKETS_LIST=("dataset" "preprocessed" "${MINIO_MLFLOW_BUCKET}")
 
 # Base locale contenant les données
-DATA_PATH="/mnt/data"
-
 echo ""
 echo "Début de la création et synchronisation des buckets MinIO..."
 echo "-----------------------------------------------------------"
@@ -42,5 +45,3 @@ done
 
 echo ""
 echo "✅ Initialisation MinIO terminée."
-
-tail -f /dev/null

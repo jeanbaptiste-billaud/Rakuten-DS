@@ -1,0 +1,162 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 5,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Predictions",
+      "gridPos": { "h": 3, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(bentoml_service_requests_total)", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Predictions / minute",
+      "gridPos": { "h": 3, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(increase(bentoml_service_requests_total[1m]))", "refId": "A" }],
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["mean"] },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green" },
+            { "color": "yellow", "value": 1 },
+            { "color": "red", "value": 5 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Average Confidence (last 5m)",
+      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "scalar(sum(rate(model_prediction_confidence_sum[5m])) / sum(rate(model_prediction_confidence_count[5m])))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Entropy (Drift Indicator)",
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 0 },
+      "targets": [{ "expr": "model_entropy_last_value", "refId": "A" }],
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": 0 },
+            { "color": "yellow", "value": 1.0 },
+            { "color": "red", "value": 2.0 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Confidence Histogram",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 3 },
+      "targets": [
+        {
+          "expr": "rate(model_prediction_confidence_bucket[5m])",
+          "legendFormat": "bucket {{le}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Entropy Histogram",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 3 },
+      "targets": [
+        {
+          "expr": "rate(model_prediction_entropy_bucket[5m])",
+          "legendFormat": "bucket {{le}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "CPU Usage",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m])",
+          "legendFormat": "CPU",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Memory Usage (RSS)",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 9 },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "RSS",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 42,
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Rakuten – Production Model Dashboard",
+  "uid": "fe1c5341-c6b0-4061-ab4b-5da02f794426",
+  "version": 3
+}

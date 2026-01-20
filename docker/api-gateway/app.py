@@ -1,170 +1,170 @@
 import os
 import logging
-from typing import Dict
 import httpx
+import time
 
+from typing import Dict, Any, Optional, Tuple
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
-from prometheus_client import (
-    Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-)
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
-# ----------------------------------------------------
-# LOGGING
-# ----------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://airflow-apiserver:8080")
+AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
+AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
+
+# --- Airflow token cache (simple, in-memory) ---
+_airflow_token: Optional[str] = None
+_airflow_token_exp: float = 0.0  # epoch seconds
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ----------------------------------------------------
-# CONFIG SERVICES
-# ----------------------------------------------------
-PREPROCESSING_SERVICE_URL = os.getenv(
-    "PREPROCESSING_SERVICE_URL", 
-    "http://localhost:8001"
-)
-MODEL_SERVICE_URL = os.getenv(
-    "MODEL_SERVICE_URL", 
-    "http://localhost:8002"
-)
+# ✅ IMPORTANT: base URL, SANS /metrics
+MODEL_SERVICE_URL = os.getenv("MODEL_SERVICE_URL", "http://model-serving:8002")
 
-# ----------------------------------------------------
-# FASTAPI
-# ----------------------------------------------------
-app = FastAPI(
-    title="Rakuten Text Classification API",
-    description="API de classification de produits basée sur les descriptions textuelles",
-    version="1.0.0"
-)
+app = FastAPI(title="Rakuten API Gateway")
 
-# ----------------------------------------------------
-# METRICS PROMETHEUS
-# ----------------------------------------------------
 API_REQUEST_COUNT = Counter(
     "api_gateway_requests_total",
     "Nombre total de requêtes reçues par l'API Gateway",
     ["endpoint", "method"]
 )
-
 API_LATENCY = Histogram(
     "api_gateway_request_latency_seconds",
     "Latence des requêtes de l'API Gateway",
     ["endpoint", "method"]
 )
 
-# ----------------------------------------------------
-# MODELES Pydantic
-# ----------------------------------------------------
-class PredictionRequest(BaseModel):
-    text: str = Field(..., description="Texte brut à classifier (description produit)")
+
+class PredictRequest(BaseModel):
+    text_cleaned: str = Field(..., description="Texte déjà nettoyé")
 
 
-class PredictionResponse(BaseModel):
-    predicted_class: int = Field(..., description="Classe prédite (prdtypecode)")
-    confidence: float = Field(..., description="Confiance de la prédiction (0-1)")
-    probabilities: Dict[int, float] = Field(..., description="Probabilités par classe")
+class PredictResponse(BaseModel):
+    predicted_class: int
+    confidence: float
+    probabilities: Dict[int, float]
 
 
-# ----------------------------------------------------
-# ROUTES API GATEWAY
-# ----------------------------------------------------
-@app.get("/")
-async def root():
-    return {
-        "service": "Rakuten API Gateway",
-        "status": "running",
-        "endpoints": ["/predict", "/health", "/metrics"]
-    }
-
-@app.get("/metrics")
-def metrics():
-    """Expose les métriques Prometheus."""
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
-
-@app.get("/health")
-async def health_check():
-    endpoint, method = "/health", "GET"
-    API_REQUEST_COUNT.labels(endpoint, method).inc()
-
-    with API_LATENCY.labels(endpoint, method).time():
-        health_status = {
-            "api_gateway": "healthy",
-            "preprocessing": "unknown",
-            "model": "unknown"
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-
-                # Preprocessing
-                try:
-                    resp = await client.get(f"{PREPROCESSING_SERVICE_URL}/health")
-                    health_status["preprocessing"] = "healthy" if resp.status_code == 200 else "unhealthy"
-                except Exception as e:
-                    health_status["preprocessing"] = f"unhealthy: {str(e)}"
-
-                # Model
-                try:
-                    resp = await client.get(f"{MODEL_SERVICE_URL}/health")
-                    health_status["model"] = "healthy" if resp.status_code == 200 else "unhealthy"
-                except Exception as e:
-                    health_status["model"] = f"unhealthy: {str(e)}"
-
-        except Exception as e:
-            logger.error(f"Erreur health check: {e}")
-
-        all_ok = all(s == "healthy" for s in health_status.values())
-
-        return {
-            "status": "healthy" if all_ok else "degraded",
-            "services": health_status
-        }
-
-
-@app.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest):
+@app.post("/predict", response_model=PredictResponse)
+async def predict(request: PredictRequest):
     endpoint, method = "/predict", "POST"
     API_REQUEST_COUNT.labels(endpoint, method).inc()
 
     with API_LATENCY.labels(endpoint, method).time():
-        logger.info(f"Nouvelle requête de prédiction ({len(request.text)} chars)")
-
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-
-                # Preprocessing
-                prep = await client.post(
-                    f"{PREPROCESSING_SERVICE_URL}/preprocess",
-                    json={"text": request.text}
-                )
-                if prep.status_code != 200:
-                    raise HTTPException(status_code=500, detail=f"Erreur preprocessing: {prep.text}")
-
-                data = prep.json()
-
-                # Prediction
-                model_resp = await client.post(
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
                     f"{MODEL_SERVICE_URL}/predict",
-                    json={"text_cleaned": data["text_cleaned"]}
+                    json={"text_cleaned": request.text_cleaned},
+                )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"model-serving error: {resp.text}")
+            return resp.json()
+
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"model-serving unreachable: {e}")
+
+
+@app.get("/health")
+async def health_check():
+    # Le model-serving de ton repo expose /metrics (pas /health) -> on ping /metrics
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{MODEL_SERVICE_URL}/metrics")
+        model_ok = (r.status_code == 200)
+    except Exception as e:
+        return {"status": "degraded", "model": f"unhealthy: {e}"}
+
+    return {"status": "healthy" if model_ok else "degraded", "model": "healthy" if model_ok else "unhealthy"}
+
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+async def get_airflow_token() -> str:
+    """
+    Récupère un JWT Airflow via /auth/token et le met en cache.
+    On refresh un peu avant expiration pour éviter les edge cases.
+    """
+    global _airflow_token, _airflow_token_exp
+
+    now = time.time()
+    if _airflow_token and now < (_airflow_token_exp - 30):  # marge 30s
+        return _airflow_token
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.post(
+            f"{AIRFLOW_API_URL}/auth/token",
+            json={"username": AIRFLOW_USERNAME, "password": AIRFLOW_PASSWORD},
+        )
+
+    if not (200 <= r.status_code < 300):
+        raise HTTPException(status_code=502, detail=f"Airflow auth/token failed ({r.status_code})")
+
+    data = r.json()
+    # Airflow renvoie typiquement: {"access_token": "...", "token_type": "bearer", "expires_in": 3600}
+    _airflow_token = data["access_token"]
+    expires_in = float(data.get("expires_in", 3600))
+    _airflow_token_exp = now + expires_in
+    return _airflow_token
+
+
+@app.post("/pipelines/{pipeline_name}")
+async def trigger_pipeline(pipeline_name: str):
+    endpoint, method = f"/pipelines/{pipeline_name}", "POST"
+    API_REQUEST_COUNT.labels(endpoint, method).inc()
+
+    PIPELINE_TO_DAG_ID = {
+        "backup": "rakuten_backup_pipeline",
+        "enrich_dataset": "rakuten_enrich_dataset",
+        "original_dataset": "rakuten_create_dataset",
+        "train": "rakuten_train_model",
+    }
+
+    dag_id = PIPELINE_TO_DAG_ID.get(pipeline_name)
+    if not dag_id:
+        raise HTTPException(status_code=404, detail="Pipeline inconnu")
+
+    dag_run_id = f"api__{pipeline_name}__{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+
+    logical_date = datetime.now(timezone.utc).isoformat()
+
+    payload = {
+        "dag_run_id": dag_run_id,
+        "logical_date": logical_date,
+        # optionnel si tu veux passer des params
+        # "conf": {}
+    }
+
+    token = await get_airflow_token()
+
+    with API_LATENCY.labels(endpoint, method).time():
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    url=f"{AIRFLOW_API_URL}/api/v2/dags/{dag_id}/dagRuns",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {token}"},
                 )
 
-                if model_resp.status_code != 200:
-                    raise HTTPException(status_code=500, detail=f"Erreur modèle: {model_resp.text}")
+            if resp.status_code not in (200, 201):
+                raise HTTPException(status_code=502, detail=f"Airflow error: {resp.text}")
 
-                result = model_resp.json()
+            return {
+                "status": "triggered",
+                "pipeline": pipeline_name,
+                "dag_id": dag_id,
+                "dag_run_id": dag_run_id
+            }
 
-                return PredictionResponse(**result)
-
-        except httpx.TimeoutException:
-            raise HTTPException(status_code=504, detail="Timeout avec les services")
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"Airflow unreachable: {e}")
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/debug/routes")
+def debug_routes():
+    return [{"path": r.path, "name": r.name} for r in app.routes]

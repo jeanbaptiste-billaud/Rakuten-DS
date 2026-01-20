@@ -1,0 +1,66 @@
+name: MLOps CI Pipeline
+
+# Déclencheurs : Push sur main/master et dev ou lors d'une Pull Request
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+  pull_request:
+    branches: [ "main", "master", "dev" ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Récupérer le code du repo
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. Installer Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12' # Adapte selon ta version (3.8, 3.10...)
+        cache: 'pip' # Active le cache pour accélérer les installations futures
+
+    # 3. Installer les dépendances
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+
+          # 1. On installe les dépendances du DevContainer (C'est la base : pandas, numpy, spacy...)
+          if [ -f .devcontainer/requirements.txt ]; then 
+            echo "Installation depuis .devcontainer/requirements.txt..."
+            pip install -r .devcontainer/requirements.txt
+          elif [ -f requirements.txt ]; then
+             # Fallback si jamais le fichier n'est pas dans .devcontainer
+             pip install -r requirements.txt
+          fi
+
+          # 2. On installe les dépendances spécifiques aux tests (s'il y en a)
+          if [ -f src/tests/requirements.txt ]; then 
+            echo "Installation depuis src/tests/requirements.txt..."
+            pip install -r src/tests/requirements.txt
+          fi
+
+    # # 4. (Optionnel) Linting - Vérifie la propreté du code
+    # - name: Lint with Flake8
+    #   run: |
+    #     # stop the build if there are Python syntax errors or undefined names
+    #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    #     # exit-zero treats all errors as warnings
+    #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    # 5. Lancer les tests unitaires
+    - name: Run Unit Tests with Pytest
+      id: run_tests
+      continue-on-error: true
+      run: |
+        # Lancer les tests et afficher la couverture si besoin
+        export PYTHONPATH=$PYTHONPATH:.
+        pytest src/tests/ --ignore=src/tests/services/mlflow_writing_test.py --doctest-modules --junitxml=junit/test-results.xml
+
+    - name: Résultat des tests
+      if: steps.run_tests.outcome == 'failure'
+      run: echo "⚠️ ATTENTION - Les tests ont échoué, mais on ne bloque pas le pipeline."

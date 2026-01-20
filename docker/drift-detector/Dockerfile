@@ -1,23 +1,21 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
 
 # Installation des dépendances système
 RUN apt-get update && apt-get install -y \
-    gcc \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copie des requirements
-COPY requirements.txt .
+COPY docker/drift-detector/requirements.txt .
 
 # Installation des dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copie du service
-COPY service.py .
-
-# Création du dossier de stockage
-RUN mkdir -p /app/drift_reports
+COPY docker/drift-detector/service.py .
 
 # Exposition du port
 EXPOSE 8003

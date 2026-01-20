@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+ARG WORKDIR=/app
+WORKDIR ${WORKDIR}
 
 COPY docker/api-gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

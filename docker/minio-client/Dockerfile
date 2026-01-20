@@ -1,8 +1,8 @@
-ARG VERSION=latest
+ARG VERSION=RELEASE.2025-08-13T08-35-41Z
 FROM minio/mc:${VERSION}
 
 # Create script directory and config directory
-RUN mkdir -p /src /config
+RUN mkdir -p /src && install -d -o root -g 1000 -m 775 /config
 
 # Create a wrapper to force mc to use the custom config directory
 RUN printf '#!/bin/sh\nexec /usr/bin/mc --config-dir /config "$@"\n' \

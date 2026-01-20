@@ -6,8 +6,10 @@ import requests
 from datetime import datetime
 
 import pandas as pd
+from matplotlib import pyplot as plt
 from mlflow.models import infer_signature
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import ConfusionMatrixDisplay
 
 from src.utils.common_utils import get_project_root
 from src.models_module_df.model_text_classifier import TextClassifier
@@ -15,6 +17,8 @@ from src.models_module_df.model_text_classifier import TextClassifier
 # --- Configuration ---
 ROOT_PATH = os.getenv("WORKDIR", get_project_root())
 DATA_PATH = os.path.join(ROOT_PATH, "data/preprocessed/preprocessed_text.csv")
+Lineage_Path = os.path.join(ROOT_PATH, "lineage/lineage.json")
+run_id_path = os.path.join(ROOT_PATH, "run_id.json")
 
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
 DRIFT_DETECTOR_URL = os.getenv("DRIFT_DETECTOR_URL", "http://localhost:8003")
@@ -69,6 +73,9 @@ with mlflow.start_run() as run:
     y_pred, _ = classifier.predict(X_val)
     metrics, cm, cr = classifier.evaluate(X_val, y_val)
 
+    # --- Log du lineage dans MLflow ---
+    mlflow.log_artifact(Lineage_Path)
+
     # --- Log des paramètres dans MLflow ---
     mlflow.log_params({
         "vectorizer": "TfidfVectorizer(max_features=45000)",
@@ -84,15 +91,27 @@ with mlflow.start_run() as run:
 
     # --- Log des métriques ---
     mlflow.log_metrics(metrics)
-    METRICS_PATH = "/tmp/metrics_text.json"
 
-    # --- Sauvegarde des résultats d'évaluation ---
-    metrics["confusion_matrix"] = cm
-    metrics["classification_report"] = cr
-    with open(METRICS_PATH, "w") as f:
+    metrics_path = "/tmp/metrics_text.json"
+    with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
+    mlflow.log_artifact(metrics_path, "eval/")
 
-    mlflow.log_artifact(METRICS_PATH, artifact_path="metrics")
+    # --- log du classification report ---
+    cr_path = "/tmp/classification_report.json"
+    with open(cr_path, "w") as f:
+        json.dump(cr, f, indent=2)
+    mlflow.log_artifact(cr_path, "eval/")
+
+    # --- log de la matrice de confusion ---
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                                  display_labels=classifier.model.classes_)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    disp.plot(ax=ax)
+    ax.set_title("Confusion Matrix")
+    mlflow.log_figure(fig, "eval/confusion_matrix.png")
+    plt.close(fig)
 
     print(f"🔗 MLflow Run ID : {run_id}")
 
@@ -158,3 +177,7 @@ with mlflow.start_run() as run:
         print("   Le training continue sans détection de drift")
 
     print("\n✅ Entraînement et évaluation terminés avec succès")
+
+run_id_path = "/tmp/run_id.json"
+with open(run_id_path, "w") as f:
+    json.dump({"run_id":run_id}, f, indent=2)

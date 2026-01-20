@@ -1,0 +1,25 @@
+#src/model_serving/bentofile.yaml
+
+service: "service:TextClassifier"
+
+include:
+  - "src/"
+  - "bentofile.yaml"
+  - "bento_requirements.txt"
+  - "service.py"
+  - "bento_model_tag.txt"
+  - "mlflow_run_id.txt"
+  - "metrics_text.json"
+
+models:
+  - "__MODEL_TAG__"
+
+python:
+  requirements_txt: "bento_requirements.txt"
+
+docker:
+  base_image: "python:3.12-slim"   # ou un autre environnement
+
+labels:
+  project: "rakuten"
+  module: "text-serving"

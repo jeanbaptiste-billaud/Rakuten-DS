@@ -14,7 +14,11 @@ def main():
     data_dir = os.path.join(root, "data")
 
     input_csv = os.path.join(data_dir, "raw/all_raw_data.csv")
-    output_csv = os.path.join(data_dir, "dataset/raw_dataset.csv")
+
+    output_dir = os.path.join(data_dir, "dataset")
+    os.makedirs(output_dir, exist_ok=True)
+
+    output_csv = os.path.join(output_dir, "raw_dataset.csv")
 
     logger.info(f"📂 Lecture du dataset source : {input_csv}")
     df = pd.read_csv(input_csv)
