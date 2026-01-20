@@ -1,4 +1,16 @@
 services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - dvc_data:/dvc_data
+    restart: always
+
   minio: # ne pas modifier le nom
     image: minio/minio:${MINIO_VERSION}
     container_name: minio-S3-storage
@@ -19,8 +31,9 @@ services:
       retries: 20
 
   minio-client: # ne pas modifier le nom
-    image: helianthus/rakuten:minio-client-${MC_VERSION}
+    image: jbbillaud/rakuten:minio-client-${MC_VERSION:-RELEASE.2025-08-13T08-35-41Z}
     container_name: minio-client
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       MINIO_MLFLOW_BUCKET: ${MINIO_MLFLOW_BUCKET}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -30,30 +43,34 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-      mc mb --ignore-existing myminio/${MINIO_MLFLOW_BUCKET}"
+    volumes:
+      - dvc_data:/dvc_data
+    command: "/src/minio_init.sh > /proc/1/fd/1 2>&1"
     tty: true
 
   dvc:
-    image: helianthus/rakuten:dvc-v3.64.0
+    image: jbbillaud/rakuten:dvc-v3.66.1
     container_name: dvc
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - dvc_data:/home/trainusr/dvc_data
-      - pgdata:/home/trainusr/pgdata
+      - dvc_data:${WORKDIR}/dvc_data
+      - pgdata:${WORKDIR}/pgdata
+      - logs_and_reports:${WORKDIR}/logs_and_reports
 
 networks:
   default:
     name: docker-network
 
 volumes:
+  pgdata:
+    name: pgdata
+    external: false
   minio_data:
     name: minio_data
     external: false
   dvc_data:
     name: dvc_data
     external: false
-  pgdata:
-    name: pgdata
+  logs_and_reports:
+    name: logs_and_reports
     external: false

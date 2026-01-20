@@ -1,79 +1,17 @@
-from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.operators.bash import BashOperator
-from airflow.utils.dates import days_ago
-from docker.types import Mount
-import os
+from airflow.sdk import dag, timezone, task
+
+from common_task import start_pipeline_task, end_pipeline_task, preprocess_task, docker_common_args
+
 
 # =============================================================================
-# 🛠️ CONFIGURATION
+# 🛠️ DÉFINITION DES TASK
 # =============================================================================
-
-MINIO_USER = os.getenv("MINIO_ROOT_USER", "minio")
-MINIO_PASS = os.getenv("MINIO_ROOT_PASSWORD", "minio123")
-WORKDIR = os.getenv("WORKDIR", "/workspace")
-# DATA_VOLUME = "airflow_data"
-# Configuration commune pour éviter de répéter le code dans chaque tâche
-DOCKER_COMMON_ARGS = {
-    "image": "spacy:3.7.5",
-    "api_version": "auto",
-    "auto_remove": True,
-    "force_pull":  False,
-    "docker_url": "unix://var/run/docker.sock",
-    "network_mode": "mlflow-network",
-    "working_dir": "/workspace",  # Dossier de travail DANS le conteneur éphémère
-    "mounts": [
-        # Mount(source=DATA_VOLUME, target="/workspace/data", type="volume"),
-    ],
-    "user":"trainusr",
-    "environment": {
-        # Indispensable pour que python trouve le module 'src'
-        "WORKDIR": WORKDIR,
-        "PYTHONPATH": "/",
-        # Config MLflow & MinIO
-        "MINIO_HOST": "minio",
-        "MINIO_PORT": "9000",
-        "MLFLOW_TRACKING_URI": "http://mlflow:5000",
-        "MLFLOW_S3_ENDPOINT_URL": "http://minio:9000",
-        "MINIO_ACCESS_KEY": MINIO_USER,
-        "MINIO_SECRET_KEY": MINIO_PASS,
-        "AWS_ACCESS_KEY_ID": MINIO_USER,     
-        "AWS_SECRET_ACCESS_KEY": MINIO_PASS,
-        "PYTHONUNBUFFERED": "1"
-    }
-}
-
-# =============================================================================
-# 🚀 DÉFINITION DU DAG
-# =============================================================================
-
-default_args = {
-    'owner': 'rakuten-team',
-    'start_date': days_ago(1),
-    'retries': 0, # Pas de retry pour le debug, on veut voir l'erreur tout de suite
-}
-
-with DAG(
-    dag_id='preprocessing_pipeline',
-    default_args=default_args,
-    schedule_interval=None, # Déclenchement manuel uniquement
-    catchup=False,
-    tags=['mlops', 'rakuten', 'docker']
-) as dag:
-
-    start = BashOperator(
-        task_id='start_pipeline',
-        bash_command='echo "🚀 Démarrage du pipeline Rakuten"'
-    )
-
-    # --- Étape 1 : Enrichissement ---
-    # Logique :
-    # 1. Pull RAW
-    # 2. Pull DATASET (existant)
-    # 3. Exécuter le script d'enrichissement
-    # 4. Push le résultat dans DATASET
-    enrich_task = DockerOperator(
+def enrich_task():
+    common_args = docker_common_args()
+    return DockerOperator(
         task_id='enrich_dataset',
+        image="jbbillaud/rakuten:spacy-v3.8.11",
         command="""sh -c '
             echo "⬇️ Downloading inputs..." &&
             python /src/utils/sync_bucket.py raw --mode pull &&
@@ -85,36 +23,42 @@ with DAG(
             echo "⬆️ Uploading results..." &&
             python /src/utils/sync_bucket.py dataset --mode push
         '""",
-        **DOCKER_COMMON_ARGS
+        doc_md="""
+        ### 🐳 Docker task
+        - Lance un conteneur Ubuntu
+        - Affiche `hello`
+        - Sert de test
+        """,
+        **common_args
     )
+
+
+# =============================================================================
+# 🚀 DÉFINITION DU DAG
+# =============================================================================
+@dag(dag_id='rakuten_enrich_dataset',
+     default_args={
+            'owner': 'rakuten-team',
+            'start_date': timezone.datetime(2025, 1, 1),
+            'retries': 0,  # Pas de retry pour le debug, on veut voir l'erreur tout de suite
+            },
+     catchup=False,
+     tags=['mlops', 'rakuten', 'docker'])
+def enrich_dataset_dag():
+    start = start_pipeline_task()
+
+    # --- Étape 1 : Enrichissement ---
+    enrich = enrich_task()
 
     # --- Étape 2 : Preprocessing ---
-    # Logique :
-    # 1. Pull DATASET (celui qui vient d'être mis à jour par l'étape précédente)
-    # 2. Exécuter le preprocessing
-    # 3. Push le résultat dans un NOUVEAU bucket "preprocessed"
-    preprocess_task = DockerOperator(
-        task_id='preprocessing',
-        command="""sh -c '
-            echo "⬇️ Downloading inputs..." &&
-            python /src/utils/sync_bucket.py dataset --mode pull &&
-            
-            echo "⚙️ Processing Preprocessing..." &&
-            python /src/preprocessing.py &&
-            
-            echo "⬆️ Uploading results..." &&
-            python /src/utils/sync_bucket.py preprocessed --mode push
-        '""",
-        **DOCKER_COMMON_ARGS
-    )
+    preprocess = preprocess_task()
 
-    end = BashOperator(
-        task_id='end_pipeline',
-        bash_command='echo "✅ Pipeline terminé avec succès"'
-    )
+    end = end_pipeline_task()
 
     # =========================================================================
     # 🔗 ORCHESTRATION
     # =========================================================================
-    
-    start >> enrich_task >> preprocess_task >> end
+
+    start >> enrich >> preprocess >> end
+
+dag = enrich_dataset_dag()

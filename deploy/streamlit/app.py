@@ -1,0 +1,264 @@
+import streamlit as st
+from pathlib import Path
+import requests
+import json
+import re
+
+
+def parse_texts(raw: str) -> list[str]:
+    s = (raw or "").strip()
+    if not s:
+        return []
+
+    # Option: si l'utilisateur colle une liste JSON ["a","b"]
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            arr = json.loads(s)
+            if isinstance(arr, list):
+                out = [str(x).strip() for x in arr if str(x).strip()]
+                if out:
+                    return out
+        except Exception:
+            pass  # fallback split
+
+    # Split virgules OU nouvelles lignes (permet "a, b" ou "a\nb")
+    parts = re.split(r"[,\n]+", s)
+    return [p.strip() for p in parts if p.strip()]
+
+
+# Configuration de la page
+st.set_page_config(
+    page_title="Rakuten MLOps Dashboard",
+    page_icon="🏭",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+workdir = "/app"
+
+# CSS personnalisé
+css_path = Path('/app/assets/styles.css')
+if css_path.exists():
+    with open(css_path) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    logo_path = Path("/app/assets/logo.png")
+    if logo_path.exists():
+        st.image("assets/logo.png", width=300)
+    st.title("🏭 Rakuten MLOps")
+    st.markdown("---")
+
+    st.subheader("🔗 Services")
+
+    # Liens vers les services
+    st.markdown("🏠 **Accueil** (page actuelle)")
+    st.markdown("---")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("📊")
+    with col2:
+        st.markdown("[MLflow](http://localhost:5000)")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("📈")
+    with col2:
+        st.markdown("[Grafana](http://localhost:3000)")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🔍")
+    with col2:
+        st.markdown("[Prometheus](http://localhost:9090)")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("⚙️")
+    with col2:
+        st.markdown("[Airflow](http://localhost:8080)")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🎯")
+    with col2:
+        st.markdown("[Drift Detector](http://localhost:8003)")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("🚀")
+    with col2:
+        st.markdown("[API Gateway](http://localhost:8000/docs)")
+
+# Contenu principal
+st.title("🏭 Rakuten MLOps - Dashboard Unifié")
+
+st.markdown("""
+Bienvenue sur le tableau de bord centralisé du projet Rakuten MLOps.
+Cette interface vous permet d'accéder à tous les outils de la stack MLOps depuis un seul endroit.
+""")
+
+# Statut des services
+st.header("📡 Statut des Services")
+
+col1, col2, col3, col4, col5 = st.columns(5)
+
+services = {
+    "MLflow": ("http://mlflow-server:5000", col1),
+    "Grafana": ("http://grafana:3000/api/health", col2),
+    "Prometheus": ("http://prometheus:9090/-/healthy", col3),
+    "Airflow": ("http://airflow-apiserver:8080/api/v2/version", col4),
+    "Model Serving": ("http://model-serving:8002/healthz", col5)
+}
+
+for name, (url, col) in services.items():
+    try:
+        response = requests.get(url, timeout=2)
+        if response.status_code == 200:
+            col.success(f"✅ {name}")
+        else:
+            col.error(f"❌ {name}")
+    except:
+        col.warning(f"⚠️ {name}")
+
+st.markdown("---")
+
+# Lecture et affichage du README simplifié
+st.header("📖 Documentation")
+
+readme_path = Path("/app/README_simplified.md")
+if readme_path.exists():
+    with open(readme_path, 'r', encoding='utf-8') as f:
+        readme_content = f.read()
+
+    # Affichage direct du markdown (Streamlit gère nativement les blocs de code)
+    st.markdown(readme_content)
+else:
+    st.error("Documentation non disponible")
+
+# Métriques rapides
+st.header("📊 Métriques en Temps Réel")
+
+col1, col2, col3, col4 = st.columns(4)
+
+# Exemple de récupération de métriques depuis Prometheus
+try:
+    perf_rul = "http://model-serving:8002/model_perf"
+
+    # Total de prédictions
+    response = requests.get(
+        perf_rul,
+        params={"query": "sum(model_requests_total)"},
+        timeout=2
+    )
+    if response.status_code == 200:
+        data = response.json()
+        if data['accuracy']:
+            acc = data['accuracy']
+            col1.metric("Accuracy", f"{acc:,}")
+        else:
+            col1.metric("Accuracy", "N/A")
+
+        if data['weighted_f1']:
+            wf1 = data['weighted_f1']
+            col2.metric("F1 pondérée", f"{wf1:,}")
+        else:
+            col2.metric("F1 pondérée", "N/A")
+
+        if data['macro_f1']:
+            mf1 = data['macro_f1']
+            col3.metric("F1 macro", f"{mf1:,}")
+        else:
+            col3.metric("F1 macro", "N/A")
+
+        if data['mean_confidence']:
+            conf = data['mean_confidence']
+            col4.metric("Confiance Moyenne", f"{conf:,}")
+        else:
+            col4.metric("Confiance Moyenne", "N/A")
+
+except Exception as e:
+    col1.metric("Accuracy", "N/A")
+    col2.metric("F1 pondérée", "N/A")
+    col3.metric("F1 macro", "N/A")
+    col4.metric("Confiance Moyenne", "N/A")
+    st.warning("⚠️ Impossible de récupérer les métriques Prometheus")
+
+# =========================
+# 🧪 Démo API / Sécurité
+# =========================
+st.markdown("---")
+st.header("🧪 Démo API / Sécurité reverse proxy (via le token d'authentification)")
+
+st.markdown(
+    """
+On envoie **la même requête** à `/predict` avec **2 tokens** :
+- **token = 456** : attendu *OK* ✅
+- **token = 100** : attendu *KO* 🚫
+"""
+)
+
+api_url = st.text_input("URL de l'endpoint /predict", value="http://reverse-proxy/predict")
+raw_text = st.text_input("Valeur de text", value="chaussures de sport, jeux fifa 2000")
+
+texts = parse_texts(raw_text)  # <- toujours une liste[str]
+
+# Preview payload
+st.caption("Payload envoyé à l'API")
+st.json({"text": texts})
+
+def call_predict(url: str, token: str, texts: list[str]) -> requests.Response:
+    headers = {"token": token, "Content-Type": "application/json"}
+    return requests.post(url, json={"text": texts}, headers=headers, timeout=30)
+
+def show_request_and_response(token_used: str, texts_sent: list[str], r: requests.Response):
+    st.subheader("📨 Requête envoyée")
+
+    payload_str = json.dumps({"text": texts_sent}, ensure_ascii=False)
+    curl_cmd = (
+        f"curl -X POST {api_url} \\\n"
+        f"  -H \"Content-Type: application/json\" \\\n"
+        f"  -H \"token: {token_used}\" \\\n"
+        f"  -d '{payload_str}'"
+    )
+    st.code(curl_cmd, language="bash")
+
+    st.subheader("📬 Réponse API")
+    if r.status_code == 200:
+        st.success(f"✅ HTTP {r.status_code} (token={token_used})")
+    else:
+        st.warning(f"⚠️ HTTP {r.status_code} (token={token_used})")
+
+    # Body
+    try:
+        st.json(r.json())
+    except Exception:
+        st.code(r.text, language="text")
+
+col_ok, col_ko = st.columns(2)
+
+with col_ok:
+    if st.button("🚀 Predict (token = 456)", type="primary", use_container_width=True):
+        try:
+            r = call_predict(api_url, "456", texts)
+            show_request_and_response("456", texts, r)
+        except Exception as e:
+            st.error(f"Erreur réseau / connexion : {e}")
+
+with col_ko:
+    if st.button("🔒 Predict (token = 100)", use_container_width=True):
+        try:
+            r = call_predict(api_url, "100", texts)
+            show_request_and_response("100", texts, r)
+        except Exception as e:
+            st.error(f"Erreur réseau / connexion : {e}")
+
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666;'>
+    <p>Rakuten MLOps Dashboard v1.0 | Propulsé par Streamlit</p>
+</div>
+""", unsafe_allow_html=True)
