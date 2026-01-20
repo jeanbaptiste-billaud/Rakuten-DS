@@ -1,6 +1,10 @@
 #!/bin/sh
+set -euo pipefail
 
-# Désactive l'arrêt sur erreur
+export MC_CONFIG_DIR=/tmp/.mc
+rm -rf "$MC_CONFIG_DIR"
+mkdir -p "$MC_CONFIG_DIR"
+
 set +e
 
 echo "🔗 Configuration de l'alias MinIO..."

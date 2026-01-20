@@ -53,7 +53,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "$AIRFLOW_DB" ]
+      test: [ "CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"" ]
       interval: 10s
       retries: 5
       start_period: 5s
@@ -185,30 +185,6 @@ services:
       - prometheus
     networks:
       - default
-
-  # =====================================================================
-  # 🛠️ MODEL-BUILDER (API de prédiction)
-  # =====================================================================
-  #  model-builder:
-  #    image: jbbillaud/rakuten:bentoml-v1.4.30
-  #    container_name: model-builder
-  #    volumes:
-  #      - /var/run/docker.sock.raw:/var/run/docker.sock
-  #    environment:
-  #      - PYTHONUNBUFFERED=1
-  #      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-  #      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-  #      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-  #      - MLFLOW_TRACKING_URI=http://mlflow-server:${MLFLOW_PORT}
-  #      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_HOST}:${MINIO_PORT}
-  #      - MLFLOW_RUN_ID=1ae0352ce67c41dab8cad9adbc0f656f
-  #    depends_on:
-  #      - mlflow-server
-  #      - minio
-  #    networks:
-  #      - default
-  #    command: tail -f /dev/null  # pour garder le conteneur en vie
-  #    tty: true
 
   # =====================================================================
   # 🟦 MODEL-SERVING (API de prédiction)
@@ -508,13 +484,13 @@ networks:
 volumes:
   pgdata:
     name: pgdata
-    external: true
+    external: false
   minio_data:
     name: minio_data
     external: true
   dvc_data:
     name: dvc_data
-    external: true
+    external: false
   logs_and_reports:
     name: logs_and_reports
     external: false

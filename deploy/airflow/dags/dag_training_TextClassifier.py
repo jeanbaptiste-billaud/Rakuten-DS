@@ -49,6 +49,8 @@ def training_task():
         echo "🧠 Training model..."
         python /src/train_text_model_with_drift.py
         
+        pwd
+        mkdir -p {WORKDIR}/training_exports
         cp -r /tmp/* {WORKDIR}/training_exports
     """)
 
@@ -162,7 +164,7 @@ def branch_on_model_promotion(**context):
 # 🚀 DÉFINITION DU DAG
 # =============================================================================
 @dag(
-    dag_id="rakuten_training_pipeline",
+    dag_id="rakuten_train_model",
     default_args={
         'owner': 'rakuten-team',
         'start_date': timezone.datetime(2025, 1, 1),

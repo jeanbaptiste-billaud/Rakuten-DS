@@ -27,6 +27,8 @@ def docker_common_args():
             "MLFLOW_S3_ENDPOINT_URL": "http://minio:9000",
             "MINIO_ACCESS_KEY": MINIO_USER,
             "MINIO_SECRET_KEY": MINIO_PASS,
+            "MINIO_ROOT_USER": MINIO_USER,
+            "MINIO_ROOT_PASSWORD": MINIO_PASS,
             "AWS_ACCESS_KEY_ID": MINIO_USER,
             "AWS_SECRET_ACCESS_KEY": MINIO_PASS,
         }

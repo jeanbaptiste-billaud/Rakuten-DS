@@ -179,12 +179,15 @@ L'objectif est d'envoyer **la même requête** à l'API `/predict` mais avec **2
 
 
 api_url = st.text_input("URL de l'endpoint /predict", value="http://reverse-proxy/predict")
-text_cleaned = st.text_input("Valeur de text_cleaned", value="chaussures de sport")
+text = st.text_input("Valeur de text", value="chaussures de sport")
 
 
-def call_predict(url: str, token: str, text_value: str) -> dict:
+def call_predict(url: str, token: str, text_value: dict[str] or str) -> dict:
     """Appelle /predict en reproduisant le curl (headers + JSON body)."""
-    payload = {"text_cleaned": text_value}
+    if isinstance(text_value, str):
+        text_value = [text_value]
+
+    payload = {"text": text_value}
     headers = {
         "Content-Type": "application/json",
         "token": token,  # important: header "token" comme dans ton curl
@@ -215,14 +218,14 @@ with col_ok:
     if st.button("🚀 Predict (token = 456)", type="primary", use_container_width=True):
         st.session_state["last_predict"] = {
             "token": "456",
-            "result": call_predict(api_url, "456", text_cleaned),
+            "result": call_predict(api_url, "456", text),
         }
 
 with col_ko:
     if st.button("🔒 Predict (token = 100)", use_container_width=True):
         st.session_state["last_predict"] = {
             "token": "100",
-            "result": call_predict(api_url, "100", text_cleaned),
+            "result": call_predict(api_url, "100", text),
         }
 
 # Affichage du résultat si disponible
@@ -236,7 +239,7 @@ if "last_predict" in st.session_state:
         f"curl -X POST {api_url} \\\n"
         f"  -H \"Content-Type: application/json\" \\\n"
         f"  -H \"token: {token_used}\" \\\n"
-        f"  -d '{{\"text_cleaned\":\"{text_cleaned}\"}}'"
+        f"  -d '{{\"text\":\"{text}\"}}'"
     )
     st.code(curl_cmd, language="bash")
 

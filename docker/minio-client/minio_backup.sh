@@ -1,4 +1,9 @@
 #!/bin/sh
+set -euo pipefail
+
+export MC_CONFIG_DIR=/tmp/.mc
+rm -rf "$MC_CONFIG_DIR"
+mkdir -p "$MC_CONFIG_DIR"
 
 set +e
 

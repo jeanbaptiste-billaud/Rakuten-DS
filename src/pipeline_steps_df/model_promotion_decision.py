@@ -2,6 +2,7 @@ import json
 import os
 from typing import Dict, Any
 
+from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
 from src.utils.common_utils import get_project_root
@@ -44,11 +45,11 @@ def extract_eval_metrics(run_payload: Dict[str, Any]) -> Dict[str, float | None]
 # ------------------------------------------------------------------
 
 def should_promote_model(
-    baseline: Dict[str, float | None],
-    candidate: Dict[str, float | None],
-    max_drop_weighted_f1: float = 0.001,
-    max_drop_accuracy: float = 0.002,
-    review_as_promote: bool = False,
+        baseline: Dict[str, float | None],
+        candidate: Dict[str, float | None],
+        max_drop_weighted_f1: float = 0.001,
+        max_drop_accuracy: float = 0.002,
+        review_as_promote: bool = False,
 ) -> bool:
     """
     Décide si le modèle candidate remplace la baseline.
@@ -62,31 +63,31 @@ def should_promote_model(
 
     # Hard gates
     if (
-        baseline["weighted_f1"] is not None
-        and candidate["weighted_f1"] is not None
-        and baseline["weighted_f1"] - candidate["weighted_f1"] > max_drop_weighted_f1
+            baseline["weighted_f1"] is not None
+            and candidate["weighted_f1"] is not None
+            and baseline["weighted_f1"] - candidate["weighted_f1"] > max_drop_weighted_f1
     ):
         return False
 
     if (
-        baseline["accuracy"] is not None
-        and candidate["accuracy"] is not None
-        and baseline["accuracy"] - candidate["accuracy"] > max_drop_accuracy
+            baseline["accuracy"] is not None
+            and candidate["accuracy"] is not None
+            and baseline["accuracy"] - candidate["accuracy"] > max_drop_accuracy
     ):
         return False
 
     if (
-        baseline["macro_f1"] is not None
-        and candidate["macro_f1"] is not None
-        and candidate["macro_f1"] < baseline["macro_f1"]
+            baseline["macro_f1"] is not None
+            and candidate["macro_f1"] is not None
+            and candidate["macro_f1"] < baseline["macro_f1"]
     ):
         return False
 
     # Soft signal : confidence
     if (
-        baseline["mean_confidence"] is not None
-        and candidate["mean_confidence"] is not None
-        and baseline["mean_confidence"] - candidate["mean_confidence"] > 0.02
+            baseline["mean_confidence"] is not None
+            and candidate["mean_confidence"] is not None
+            and baseline["mean_confidence"] - candidate["mean_confidence"] > 0.02
     ):
         return review_as_promote
 
@@ -100,8 +101,8 @@ def should_promote_model(
 if __name__ == "__main__":
     mlflow_client = MlflowClient()
 
-    workdir  = os.getenv("WORKDIR", "/app")
-    run_id_path  = os.path.join(workdir, "training_exports", "run_id.json")
+    workdir = os.getenv("WORKDIR", "/app")
+    run_id_path = os.path.join(workdir, "training_exports", "run_id.json")
 
     # Run ID du nouveau modèle (issu de l'entraînement)
     with open(run_id_path, "r") as f:
@@ -112,18 +113,23 @@ if __name__ == "__main__":
 
     # Récupération MLflow
     new_model_metrics = get_run_metrics(mlflow_client, new_run_id)
-    actual_model_metrics = get_run_metrics(mlflow_client, model_run_id)
+    try:
+        actual_model_metrics = get_run_metrics(mlflow_client, model_run_id)
+        # Extraction métriques utiles
+        new_eval = extract_eval_metrics(new_model_metrics)
+        actual_eval = extract_eval_metrics(actual_model_metrics)
 
-    # Extraction métriques utiles
-    new_eval = extract_eval_metrics(new_model_metrics)
-    actual_eval = extract_eval_metrics(actual_model_metrics)
-
-    # Décision
-    promote = should_promote_model(
-        baseline=actual_eval,
-        candidate=new_eval,
-        review_as_promote=False,
-    )
+        # Décision
+        promote = should_promote_model(
+            baseline=actual_eval,
+            candidate=new_eval,
+            review_as_promote=False,
+        )
+    except RestException as e:
+        if "RESOURCE_DOES_NOT_EXIST" in str(e):
+            promote = True
+        else:
+            raise
 
     # IMPORTANT : dernière ligne stdout pour XCom
     print(str(promote).lower())
