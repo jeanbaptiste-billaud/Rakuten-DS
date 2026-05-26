@@ -1,0 +1,200 @@
+metadata:
+  source: Generated from docker/*/requirements.txt and docker/docker-images-build.sh
+  version_policy: single_catalog_version_per_library
+catalog:
+  pypi:
+    bentoml: ==1.4.33
+    boto3: ==1.42.29
+    dvc:
+      version: ==3.66.1
+      extras:
+      - all
+    evidently: ==0.7.20
+    fastapi: ==0.128.0
+    GitPython: ==3.1.46
+    httpx: ==0.28.1
+    joblib: ==1.5.3
+    markdown: ==3.5.1
+    minio: ==7.2.20
+    mlflow:
+      version: ==3.8.1
+      extras:
+        - extras
+        - db
+    pandas: ==2.3.3
+    pathspec: <1
+    plotly: ==5.18.0
+    prometheus-client: ==0.24.1
+    pydantic: ==2.12.5
+    requests: ==2.31.0
+    scikit-learn: ==1.8.0
+    spacy: ==3.8.11
+    streamlit: ==1.29.0
+    streamlit-option-menu: ==0.3.6
+    uv: ==0.9.26
+    uvicorn:
+      version: ==0.40.0
+      extras:
+      - standard
+features:
+  api-gateway:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - httpx
+    - prometheus-client
+  auth-service:
+    pypi:
+    - fastapi
+    - uvicorn
+  bentoml:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - joblib
+    - bentoml
+    - mlflow
+    - prometheus-client
+    - boto3
+    - spacy
+    - uv
+  drift-detector:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - pandas
+    - evidently
+    - httpx
+  dvc:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - minio
+    - prometheus-client
+    - dvc
+    - pathspec
+    - GitPython
+  minio-client:
+    pypi: []
+  mlflow:
+    pypi:
+    - mlflow
+    - boto3
+  spacy:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - spacy
+    - minio
+    - prometheus-client
+    - pandas
+  trainer:
+    pypi:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - pandas
+    - scikit-learn
+    - joblib
+    - mlflow
+    - minio
+    - boto3
+  streamlit:
+    pypi:
+    - streamlit
+    - streamlit-option-menu
+    - pandas
+    - plotly
+    - requests
+    - markdown
+  airflow:
+    pypi: []
+  reverse-proxy:
+    pypi: []
+images:
+  api-gateway:
+    dockerfile: docker/api-gateway/Dockerfile
+    image: jbbillaud/rakuten:fastapi-v0.128.0
+    feature: api-gateway
+    requirements: docker/api-gateway/requirements.txt
+  auth-service:
+    dockerfile: docker/auth-service/Dockerfile
+    image: jbbillaud/rakuten:authentification
+    feature: auth-service
+    requirements: docker/auth-service/requirements.txt
+  bentoml:
+    dockerfile: docker/bentoml/Dockerfile
+    image: jbbillaud/rakuten:bentoml-v1.4.33
+    feature: bentoml
+    requirements: docker/bentoml/requirements.txt
+  drift-detector:
+    dockerfile: docker/drift-detector/Dockerfile
+    image: jbbillaud/rakuten:evidently-v0.7.20
+    feature: drift-detector
+    requirements: docker/drift-detector/requirements.txt
+  dvc:
+    dockerfile: docker/dvc/Dockerfile
+    image: jbbillaud/rakuten:dvc-v3.66.1
+    feature: dvc
+    requirements: docker/dvc/requirements.txt
+  minio-client:
+    dockerfile: docker/minio-client/Dockerfile
+    image: jbbillaud/rakuten:minio-client-RELEASE.2025-08-13T08-35-41Z
+    feature: minio-client
+  mlflow:
+    dockerfile: docker/mlflow/Dockerfile
+    image: jbbillaud/rakuten:mlflow-v3.8.1
+    feature: mlflow
+  spacy:
+    dockerfile: docker/spacy/Dockerfile
+    image: jbbillaud/rakuten:spacy-v3.8.11
+    feature: spacy
+    requirements: docker/spacy/requirements.txt
+  trainer:
+    dockerfile: docker/trainer/Dockerfile
+    image: jbbillaud/rakuten:sklearn-v1.8.0
+    feature: trainer
+    requirements: docker/trainer/requirements.txt
+  streamlit:
+    dockerfile: docker/streamlit/Dockerfile
+    image: jbbillaud/rakuten:streamlit-v1.29.0
+    feature: streamlit
+    requirements: docker/streamlit/requirements.txt
+  airflow:
+    dockerfile: docker/airflow/Dockerfile
+    image: jbbillaud/rakuten:airflow-v3.1.3
+    feature: airflow
+  reverse-proxy:
+    dockerfile: docker/reverse-proxy/Dockerfile
+    image: jbbillaud/rakuten:nginx-v3.23
+    feature: reverse-proxy
+environments:
+  api-gateway:
+  - api-gateway
+  auth-service:
+  - auth-service
+  bentoml:
+  - bentoml
+  drift-detector:
+  - drift-detector
+  dvc:
+  - dvc
+  minio-client:
+  - minio-client
+  mlflow:
+  - mlflow
+  spacy:
+  - spacy
+  trainer:
+  - trainer
+  streamlit:
+  - streamlit
+  airflow:
+  - airflow
+  reverse-proxy:
+  - reverse-proxy

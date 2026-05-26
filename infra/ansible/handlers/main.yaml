@@ -1,0 +1,20 @@
+#infra/ansible/handlers/main.yaml
+---
+- name: Restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+
+- name: Restart containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+
+- name: Restart microk8s
+  ansible.builtin.command:
+    name: microk8s
+    cmd: snap restart microk8s
+
+#- name: Restart microk8s
+#  ansible.builtin.command:
+#    cmd: snap restart microk8s

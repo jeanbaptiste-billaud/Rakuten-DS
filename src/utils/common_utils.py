@@ -1,10 +1,10 @@
 # common_utils.py
-import os
+from pathlib import Path
 
 
 def get_project_root():
     """Retourne le chemin absolu vers la racine du projet (Rakuten-DS)."""
-    return os.path.dirname(os.path.abspath(os.path.join(__file__, "../..")))
+    return Path(__file__).resolve().parents[2]
 
 
 

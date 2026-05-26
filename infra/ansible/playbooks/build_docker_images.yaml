@@ -1,0 +1,70 @@
+- name: setup env and build docker images
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Define project root
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        project_root: "{{ playbook_dir }}/../../.."
+
+    - name: Define derived paths
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        docker_root: "{{ project_root }}/docker"
+        scripts_root: "{{ project_root }}/src"
+
+    - name: Define catalog paths
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        catalog_dir: "{{ docker_root }}/python_library_catalogs"
+        catalog_yaml: "{{ docker_root }}/python_library_catalogs/stable.yaml"
+        catalog_toml: "{{ docker_root }}/python_library_catalogs/pixi.toml"
+
+    - name: Generate toml file
+      ansible.builtin.command:
+        cmd: >
+          python3 {{ scripts_root }}/deps/generate_pixi_toml.py
+                -i {{ catalog_yaml }}
+                -o {{ catalog_toml }}
+                --python 3.12.*
+      args:
+        chdir: "{{ project_root }}"
+      changed_when: true
+
+    - name: Generate pixi lock
+      ansible.builtin.command:
+        cmd: pixi lock
+      args:
+        chdir: "{{ catalog_dir }}"
+      environment:
+        PATH: "{{ pixi_bin_path }}:{{ ansible_facts.env.PATH }}"
+
+    - name: Build Pixi image
+      tags:
+        - build-pixi
+      containers.podman.podman_image:
+        name: docker.io/jbbillaud/rakuten
+        tag: pixi-latest
+        path: "{{ project_root }}"
+        push: true
+        build:
+          file: "{{ docker_root }}/pixi/Dockerfile"
+          extra_args: >
+            --build-arg PIXI_CATALOG_DIR=docker/python_library_catalogs
+
+    - name: Build MLflow image
+      tags:
+        - build-mlflow
+      containers.podman.podman_image:
+        name: docker.io/jbbillaud/rakuten
+        tag: mlflow-latest
+        path: "{{ project_root }}"
+        push: true
+        build:
+          file: "{{ docker_root }}/mlflow/Dockerfile"
+          extra_args: >
+            --build-arg PIXI_CATALOG_DIR=docker/python_library_catalogs

@@ -1,11 +1,28 @@
-ARG VERSION=v3.8.1
+# ---------- Builder ----------
+FROM docker.io/jbbillaud/rakuten:pixi-latest AS builder
 
-FROM ghcr.io/mlflow/mlflow:${VERSION}
+WORKDIR /app
 
-# On installe juste les dépendances
-RUN pip install --no-cache-dir psycopg2-binary boto3 gunicorn
-RUN mkdir -p /workspace/models && chmod -R 777 /workspace/models
+ARG PIXI_CATALOG_DIR=docker/python_library_catalogs
+
+COPY ${PIXI_CATALOG_DIR}/pixi.toml ./pixi.toml
+COPY ${PIXI_CATALOG_DIR}/pixi.lock ./pixi.lock
+
+RUN pixi install -e mlflow --locked \
+ && pixi clean cache --yes
 
 
-# AUCUN CMD, AUCUN ENTRYPOINT ICI.
-# On laisse le docker-compose décider.
+# ---------- Runtime ----------
+FROM python:3.12-slim AS runtime
+
+ENV PIXI_HOME=/opt/pixi
+ENV PATH="${PIXI_HOME}/bin:/app/.pixi/envs/mlflow/bin:${PATH}"
+
+WORKDIR /app
+
+COPY --from=builder /opt/pixi /opt/pixi
+COPY --from=builder /app/.pixi /app/.pixi
+COPY --from=builder /app/pixi.toml /app/pixi.toml
+COPY --from=builder /app/pixi.lock /app/pixi.lock
+
+EXPOSE 5000

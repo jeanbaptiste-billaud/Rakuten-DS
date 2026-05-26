@@ -1,0 +1,6 @@
+pixi_home: "{{ ansible_facts.env.HOME }}/.pixi"
+pixi_bin_path: "{{ pixi_home }}/bin"
+
+docker_builder_image: "rakuten-bentoml-builder"
+
+python_version: "3.12"
