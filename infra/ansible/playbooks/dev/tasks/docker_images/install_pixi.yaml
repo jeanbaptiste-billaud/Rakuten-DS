@@ -1,0 +1,21 @@
+---
+- name: Download pixi install file
+  ansible.builtin.get_url:
+    url: https://pixi.sh/install.sh
+    dest: /tmp/install_pixi.sh
+    mode: '0755'
+
+- name: Install pixi
+  ansible.builtin.shell: sh /tmp/install_pixi.sh
+
+- name: Add pixi to PATH in shell config
+  ansible.builtin.blockinfile:
+    path: "{{ ansible_facts.env.HOME }}/.profile"
+    marker: "# {mark} ANSIBLE PIXI"
+    block: |
+      export PATH="{{ pixi_bin_path }}:$PATH"
+
+- name: Check pixi version
+  ansible.builtin.command: pixi --version
+  environment:
+    PATH: "{{ pixi_bin_path }}:{{ ansible_facts.env.PATH }}"

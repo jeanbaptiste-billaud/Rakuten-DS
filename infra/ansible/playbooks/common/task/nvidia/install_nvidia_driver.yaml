@@ -1,0 +1,6 @@
+# infra/ansible/tasks/install_nvidia_driver.yaml
+---
+- name: Install NVIDIA driver if missing
+  ansible.builtin.debug:
+    msg: "Driver NVIDIA absent, installation nécessaire"
+  when: not nvidia_driver_installed

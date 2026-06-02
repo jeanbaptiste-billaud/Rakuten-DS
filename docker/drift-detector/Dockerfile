@@ -1,24 +1,39 @@
-FROM python:3.12-slim
+# ---------- Builder ----------
+FROM docker.io/jbbillaud/rakuten:pixi-latest AS builder
 
-ARG WORKDIR=/app
-WORKDIR ${WORKDIR}
+WORKDIR /app
 
-# Installation des dépendances système
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+ARG PIXI_CATALOG_DIR
+ARG PIXI_ENV
 
-# Copie des requirements
-COPY docker/drift-detector/requirements.txt .
+COPY ${PIXI_CATALOG_DIR}/pixi.toml ./pixi.toml
+COPY ${PIXI_CATALOG_DIR}/pixi.lock ./pixi.lock
 
-# Installation des dépendances Python
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pixi install -e ${PIXI_ENV} --locked \
+ && pixi clean cache --yes
+
+
+# ---------- Runtime ----------
+FROM dhi.io/python:3.12-debian13 AS runtime
+
+ARG PIXI_ENV
+
+ENV PIXI_HOME=/opt/pixi
+ENV PATH="${PIXI_HOME}/bin:/app/.pixi/envs/${PIXI_ENV}/bin:${PATH}"
+
+WORKDIR /app
+
+COPY --from=builder /opt/pixi /opt/pixi
+COPY --from=builder /app/.pixi /app/.pixi
+COPY --from=builder /app/pixi.toml /app/pixi.toml
+COPY --from=builder /app/pixi.lock /app/pixi.lock
 
 # Copie du service
-COPY docker/drift-detector/service.py .
+COPY docker/${PIXI_ENV}/service.py .
 
 # Exposition du port
 EXPOSE 8003
 
 # Commande de démarrage
+ENTRYPOINT []
 CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8003"]

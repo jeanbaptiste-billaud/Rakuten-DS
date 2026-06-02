@@ -1,0 +1,85 @@
+- name: setup env and build docker images
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Define project root
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        project_root: "{{ playbook_dir }}/../../../.."
+
+    - name: Define derived paths
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        docker_root: "{{ project_root }}/docker"
+        scripts_root: "{{ project_root }}/src"
+
+    - name: Define catalog paths
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        catalog_dir: "{{ docker_root }}/python_library_catalogs"
+        catalog_dir_from_context: "docker/python_library_catalogs"
+        catalog_yaml: "{{ docker_root }}/python_library_catalogs/stable.yaml"
+        catalog_toml: "{{ docker_root }}/python_library_catalogs/pixi.toml"
+        catalog_lock: "{{ docker_root }}/python_library_catalogs/pixi.lock"
+
+    - name: Load Python library catalog
+      tags:
+        - always
+      ansible.builtin.include_vars:
+        file: "{{ catalog_yaml }}"
+        name: library_catalog
+
+    - name: Define docker repository
+      tags:
+        - always
+      ansible.builtin.set_fact:
+        docker_repository: "{{ library_catalog.images.repository }}"
+
+    - name: Check Pixi image
+      tags:
+        - always
+      vars:
+        pixi_tag: "pixi-latest"
+      ansible.builtin.include_tasks:
+        file: tasks/docker_images/check_images_builder.yaml
+        apply:
+          tags:
+            - always
+
+    - name: Generate pixi files
+      tags:
+        - always
+      vars:
+        pixi_image: "{{ docker_repository }}:pixi-latest"
+      ansible.builtin.include_tasks:
+        file: tasks/docker_images/pixi_files_generation.yaml
+        apply:
+          tags:
+            - always
+
+    - name: Build one Docker image
+      ansible.builtin.include_tasks:
+        file: tasks/docker_images/build_one_image.yaml
+        apply:
+          tags:
+            - build-one
+      tags:
+        - build-one
+      vars:
+        image_name: "{{ target_image }}"
+        image_cfg: "{{ library_catalog.images[target_image] }}"
+
+    - name: Build all Docker images
+      tags:
+        - build-all
+      ansible.builtin.include_tasks:
+        file: tasks/docker_images/build_all_images.yaml
+        apply:
+          tags:
+            - build-all
+      vars:
+        images_catalog: "{{ library_catalog.images }}"

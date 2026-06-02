@@ -1,0 +1,7 @@
+# tasks/build_all_images.yaml
+---
+- name: Build all Docker images from catalog
+  ansible.builtin.include_tasks: build_one_image.yaml
+  loop: "{{ images_catalog.keys() | difference(['repository']) }}"
+  loop_control:
+    loop_var: image_name

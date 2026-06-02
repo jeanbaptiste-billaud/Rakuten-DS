@@ -11,4 +11,17 @@
   - evidently
 
 
-- créer fichier uv pour centraliser les dépendances des images docker 
+- airflow:
+  - supprimer tache bashoperator dans pipeline entrainement
+  - remplacer par Trigger Jenkins job:
+    - bento build & container
+    - push registry
+    - deploy
+    - Healthcheck
+
+
+- ZenML
+  - découper entraînement en steps propres
+  - gérer train / evaluate / compare
+  - logger vers MLflow
+  - produire un modèle candidat

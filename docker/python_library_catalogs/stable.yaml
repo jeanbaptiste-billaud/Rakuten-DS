@@ -1,25 +1,30 @@
 metadata:
   source: Generated from docker/*/requirements.txt and docker/docker-images-build.sh
   version_policy: single_catalog_version_per_library
+
 catalog:
+  conda:
+    antlr4-python3-runtime: ==4.9.3
+    spacy-model-fr_core_news_sm: "*"
+    git: ==2.54.0
+
   pypi:
     bentoml: ==1.4.33
     boto3: ==1.42.29
     dvc:
       version: ==3.66.1
       extras:
-      - all
+      - s3
     evidently: ==0.7.20
     fastapi: ==0.128.0
-    GitPython: ==3.1.46
     httpx: ==0.28.1
     joblib: ==1.5.3
     markdown: ==3.5.1
     minio: ==7.2.20
     mlflow:
-      version: ==3.8.1
+      version: ==3.9.0
       extras:
-        - extras
+#        - extras
         - db
     pandas: ==2.3.3
     pathspec: <1
@@ -29,13 +34,14 @@ catalog:
     requests: ==2.31.0
     scikit-learn: ==1.8.0
     spacy: ==3.8.11
+    fr-core-news-sm: ==3.8.0
     streamlit: ==1.29.0
     streamlit-option-menu: ==0.3.6
-    uv: ==0.9.26
     uvicorn:
       version: ==0.40.0
       extras:
       - standard
+
 features:
   api-gateway:
     pypi:
@@ -49,6 +55,8 @@ features:
     - fastapi
     - uvicorn
   bentoml:
+    conda:
+#      - spacy-model-fr_core_news_sm
     pypi:
     - fastapi
     - uvicorn
@@ -59,7 +67,6 @@ features:
     - prometheus-client
     - boto3
     - spacy
-    - uv
   drift-detector:
     pypi:
     - fastapi
@@ -69,6 +76,9 @@ features:
     - evidently
     - httpx
   dvc:
+    conda:
+      - git
+      - antlr4-python3-runtime
     pypi:
     - fastapi
     - uvicorn
@@ -77,7 +87,6 @@ features:
     - prometheus-client
     - dvc
     - pathspec
-    - GitPython
   minio-client:
     pypi: []
   mlflow:
@@ -85,6 +94,8 @@ features:
     - mlflow
     - boto3
   spacy:
+    conda:
+#    - spacy-model-fr_core_news_sm
     pypi:
     - fastapi
     - uvicorn
@@ -94,6 +105,8 @@ features:
     - prometheus-client
     - pandas
   trainer:
+    conda:
+      - git
     pypi:
     - fastapi
     - uvicorn
@@ -116,63 +129,7 @@ features:
     pypi: []
   reverse-proxy:
     pypi: []
-images:
-  api-gateway:
-    dockerfile: docker/api-gateway/Dockerfile
-    image: jbbillaud/rakuten:fastapi-v0.128.0
-    feature: api-gateway
-    requirements: docker/api-gateway/requirements.txt
-  auth-service:
-    dockerfile: docker/auth-service/Dockerfile
-    image: jbbillaud/rakuten:authentification
-    feature: auth-service
-    requirements: docker/auth-service/requirements.txt
-  bentoml:
-    dockerfile: docker/bentoml/Dockerfile
-    image: jbbillaud/rakuten:bentoml-v1.4.33
-    feature: bentoml
-    requirements: docker/bentoml/requirements.txt
-  drift-detector:
-    dockerfile: docker/drift-detector/Dockerfile
-    image: jbbillaud/rakuten:evidently-v0.7.20
-    feature: drift-detector
-    requirements: docker/drift-detector/requirements.txt
-  dvc:
-    dockerfile: docker/dvc/Dockerfile
-    image: jbbillaud/rakuten:dvc-v3.66.1
-    feature: dvc
-    requirements: docker/dvc/requirements.txt
-  minio-client:
-    dockerfile: docker/minio-client/Dockerfile
-    image: jbbillaud/rakuten:minio-client-RELEASE.2025-08-13T08-35-41Z
-    feature: minio-client
-  mlflow:
-    dockerfile: docker/mlflow/Dockerfile
-    image: jbbillaud/rakuten:mlflow-v3.8.1
-    feature: mlflow
-  spacy:
-    dockerfile: docker/spacy/Dockerfile
-    image: jbbillaud/rakuten:spacy-v3.8.11
-    feature: spacy
-    requirements: docker/spacy/requirements.txt
-  trainer:
-    dockerfile: docker/trainer/Dockerfile
-    image: jbbillaud/rakuten:sklearn-v1.8.0
-    feature: trainer
-    requirements: docker/trainer/requirements.txt
-  streamlit:
-    dockerfile: docker/streamlit/Dockerfile
-    image: jbbillaud/rakuten:streamlit-v1.29.0
-    feature: streamlit
-    requirements: docker/streamlit/requirements.txt
-  airflow:
-    dockerfile: docker/airflow/Dockerfile
-    image: jbbillaud/rakuten:airflow-v3.1.3
-    feature: airflow
-  reverse-proxy:
-    dockerfile: docker/reverse-proxy/Dockerfile
-    image: jbbillaud/rakuten:nginx-v3.23
-    feature: reverse-proxy
+
 environments:
   api-gateway:
   - api-gateway
@@ -198,3 +155,47 @@ environments:
   - airflow
   reverse-proxy:
   - reverse-proxy
+  pixi:
+    []
+
+images:
+  repository: "docker.io/jbbillaud/rakuten"
+  api-gateway:
+    dockerfile: api-gateway/Dockerfile
+    pixi-env: api-gateway
+  auth-service:
+    dockerfile: auth-service/Dockerfile
+    pixi-env: auth-service
+  bentoml:
+    dockerfile: bentoml/Dockerfile
+    pixi-env: bentoml
+  drift-detector:
+    dockerfile: drift-detector/Dockerfile
+    pixi-env: drift-detector
+  dvc:
+    dockerfile: dvc/Dockerfile
+    pixi-env: dvc
+  minio-client:
+    dockerfile: minio-client/Dockerfile
+    pixi-env: minio-client
+  mlflow:
+    dockerfile: mlflow/Dockerfile
+    pixi-env: mlflow
+  spacy:
+    dockerfile: spacy/Dockerfile
+    pixi-env: spacy
+  trainer:
+    dockerfile: trainer/Dockerfile
+    pixi-env: trainer
+  streamlit:
+    dockerfile: streamlit/Dockerfile
+    pixi-env: streamlit
+  airflow:
+    dockerfile: airflow/Dockerfile
+    pixi-env: airflow
+  reverse-proxy:
+    dockerfile: reverse-proxy/Dockerfile
+    pixi-env: reverse-proxy
+  pixi:
+    dockerfile: pixi/Dockerfile
+    pixi-env: pixi

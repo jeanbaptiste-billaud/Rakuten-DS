@@ -1,0 +1,6 @@
+- name: Backup MinIo
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Define project root

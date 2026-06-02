@@ -161,10 +161,10 @@ def generate_pixi_toml(
 
     # Optional global Python dependency for all generated environments.
     # If you need per-feature Python versions, put python in catalog.conda and feature.<name>.conda.
-    if python_version:
-        lines.append("[dependencies]")
-        lines.append(f"python = {toml_string(python_version)}")
-        lines.append("")
+    # if python_version:
+    #     lines.append("[dependencies]")
+    #     lines.append(f"python = {toml_string(python_version)}")
+    #     lines.append("")
 
     non_empty_feature_names: set[str] = set()
 
@@ -172,6 +172,10 @@ def generate_pixi_toml(
         feature_def = features[feature_name] or {}
         conda_deps = feature_dependencies(feature_name, feature_def, conda_catalog, "conda")
         pypi_deps = feature_dependencies(feature_name, feature_def, pypi_catalog, "pypi")
+
+        # Pixi needs a Python interpreter inside each environment that resolves PyPI deps.
+        if python_version and pypi_deps and "python" not in conda_deps:
+            conda_deps["python"] = python_version
 
         if conda_deps or pypi_deps:
             non_empty_feature_names.add(feature_name)

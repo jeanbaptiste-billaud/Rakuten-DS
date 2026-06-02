@@ -1,0 +1,20 @@
+# tasks/build_one_image.yaml
+
+- name: Prepare image build config
+  ansible.builtin.include_tasks: tasks/docker_images/prepare_build_image.yaml
+
+- name: Build docker image {{ build_image.repository }}:{{ build_image.tag }}
+  containers.podman.podman_image:
+    name: "{{ build_image.repository }}"
+    tag: "{{ build_image.tag }}"
+    path: "{{ build_image.build_context }}"
+    build:
+      file: "{{ build_image.dockerfile_path }}"
+      force_rm: true
+      extra_args : >-
+        --build-arg PIXI_ENV="{{ build_image.name }}"
+        --build-arg PIXI_CATALOG_DIR="{{ catalog_dir_from_context }}"
+    force: "{{ force_rebuild | default(false) }}"
+    push: "{{ push | default(true) }}"
+  environment:
+    REGISTRY_AUTH_FILE: "{{ ansible_facts.env.HOME }}/.config/containers/auth.json"

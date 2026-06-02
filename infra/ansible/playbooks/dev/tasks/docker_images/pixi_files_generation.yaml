@@ -1,0 +1,53 @@
+#infra/ansible/playbooks/tasks/docker_images/pixi_files_generation.yaml
+---
+- stat:
+    path: "{{ catalog_yaml }}"
+    checksum_algorithm: sha256
+  register: yaml_info
+
+- stat:
+    path: "{{ catalog_toml }}"
+    checksum_algorithm: sha256
+  register: toml_info
+
+- stat:
+    path: "{{ catalog_lock }}"
+    checksum_algorithm: sha256
+  register: lock_info
+
+
+- name: Generate pixi.toml file
+  ansible.builtin.command:
+    cmd: >
+      python3 {{ scripts_root }}/deps/generate_pixi_toml.py
+            -i {{ catalog_yaml }}
+            -o {{ catalog_toml }}
+            --python {{ python_version }}
+  args:
+    chdir: "{{ project_root }}"
+  when: >
+    not toml_info.stat.exists or
+    yaml_info.stat.mtime > toml_info.stat.mtime
+  register: toml_generation
+
+- name: Generate pixi.lock file
+  containers.podman.podman_container:
+    name: "pixi_builder"
+    image: "{{ pixi_image }}"
+    recreate: true
+    rm: true
+    detach: false
+    workdir: /workspace
+    volumes:
+    - "{{ catalog_dir }}:/workspace:Z"
+    user: "{{ ansible_facts.user_uid }}:{{ ansible_facts.user_gid }}"
+    userns: keep-id
+    command: pixi lock
+  when: toml_generation.changed or not lock_info.stat.exists
+
+#  ansible.builtin.command:
+#    cmd: pixi lock
+#  args:
+#    chdir: "{{ catalog_dir }}"
+#  environment:
+#    PATH: "{{ pixi_path.pixi_bin_path }}:{{ ansible_facts.env.PATH }}"

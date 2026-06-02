@@ -1,0 +1,31 @@
+# infra/ansible/tasks/configure_nvidia_runtime.yaml
+---
+- name: Setup NVIDIA Container Toolkit
+  vars:
+    runtimes:
+      - name: docker
+        service: docker.service
+
+      - name: containerd
+        service: containerd.service
+
+      - name: microk8s
+        runtime: containerd
+        service: snap.microk8s.daemon-containerd.service
+        config: /var/snap/microk8s/current/args/containerd-template.toml
+
+  tasks:
+    - name: Configure NVIDIA runtimes
+      ansible.builtin.command:
+        cmd: >
+          nvidia-ctk runtime configure
+          --runtime={{ item.runtime | default(item.name) }}
+          {% if item.config is defined %}
+          --config={{ item.config }}
+          {% endif %}
+        when:
+          - item.service in ansible_facts.services
+          - ansible_facts.services[item.service].state == 'running'
+        notify: "Restart {{ item.name }}"
+        loop: "{{ runtimes }}"
+

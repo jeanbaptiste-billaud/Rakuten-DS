@@ -1,6 +1,6 @@
 x-airflow-common:
   &airflow-common
-  image: jbbillaud/rakuten:airflow-v3.1.3
+  image: dhi.io/airflow:3-compat
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor

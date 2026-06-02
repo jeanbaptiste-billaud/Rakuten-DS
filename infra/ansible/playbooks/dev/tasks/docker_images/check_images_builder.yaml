@@ -1,0 +1,32 @@
+# tasks/check_images_builder.yaml
+
+- name: Ensure Pixi builder image exists
+  vars:
+    pixi_image: "{{ docker_repository }}:{{ pixi_tag }}"
+  block:
+    - name: Check Pixi image locally
+      containers.podman.podman_image_info:
+        name: "{{ pixi_image }}"
+      register: pixi_info
+
+    - name: Pull Pixi image if absent
+      when: pixi_info.images | length == 0
+      containers.podman.podman_image:
+        pull: true
+        name: "{{ pixi_image }}"
+
+  rescue:
+    - name: Build Pixi image locally if absent/pull failed
+      block:
+        - name: Build Pixi image locally
+          ansible.builtin.import_tasks: build_one_image.yaml
+          vars:
+            image_name: "pixi"
+            image_cfg: "{{ library_catalog.images[pixi] }}"
+
+      rescue:
+        - name: Fail if dependency image missing
+          ansible.builtin.fail:
+            msg: >
+              Required Pixi image ({{ pixi_image }})
+              is missing. Build or pull it first.

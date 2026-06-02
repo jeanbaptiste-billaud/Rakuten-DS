@@ -6,9 +6,6 @@
   gather_facts: true
 
   tasks:
-    - name: Install Pixi
-      ansible.builtin.include_tasks: tasks/install_pixi.yaml
-
     - name: Install Podman
       ansible.builtin.apt:
         name:

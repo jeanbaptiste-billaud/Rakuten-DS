@@ -1,21 +1,43 @@
-FROM ubuntu:noble
+# ---------- Builder ----------
+FROM docker.io/jbbillaud/rakuten:pixi-latest AS builder
 
-RUN apt update && apt install -y git-all python3 python3-pip python3-venv && ln -sf python3 /usr/bin/python \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-COPY docker/dvc/requirements.txt .
-ENV VIRTUAL_ENV=/myenv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ARG PIXI_CATALOG_DIR
+ARG PIXI_ENV
 
-# installation des bibliothèques
-RUN pip install --no-cache-dir -r requirements.txt
+COPY ${PIXI_CATALOG_DIR}/pixi.toml ./pixi.toml
+COPY ${PIXI_CATALOG_DIR}/pixi.lock ./pixi.lock
+
+RUN pixi install -e ${PIXI_ENV} --locked \
+ && pixi clean cache --yes
 
 RUN mkdir -p /src && touch /src/__init__.py
 COPY src/utils/generate_data_lineage.py /src/generate_data_lineage.py
+
+RUN groupadd -g 1000 trainusr \
+ && useradd -u 1000 -g trainusr -m -s /bin/bash trainusr
+
+# ---------- Runtime ----------
+FROM dhi.io/python:3.12-debian13 AS runtime
+
+WORKDIR /app
+
+COPY --from=builder /opt/pixi /opt/pixi
+COPY --from=builder /app/.pixi /app/.pixi
+COPY --from=builder /app/pixi.toml /app/pixi.toml
+COPY --from=builder /app/pixi.lock /app/pixi.lock
+
+ARG PIXI_ENV
+
+ENV PIXI_HOME=/opt/pixi
+ENV PATH="${PIXI_HOME}/bin:/app/.pixi/envs/${PIXI_ENV}/bin:${PATH}"
+
+COPY --from=builder /src /src
 ENV PYTHONPATH="/"
 
-RUN usermod -l trainusr ubuntu #par défaut uid 1000 est attribué au user ubuntu
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
 USER trainusr
 
 ARG WORKDIR=/app
@@ -23,4 +45,5 @@ WORKDIR ${WORKDIR}
 
 EXPOSE 8001
 
+ENTRYPOINT []
 CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8001"]

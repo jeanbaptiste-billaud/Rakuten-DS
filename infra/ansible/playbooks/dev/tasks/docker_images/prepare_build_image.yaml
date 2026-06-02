@@ -1,0 +1,9 @@
+---
+- name: Prepare build_image from catalog
+  ansible.builtin.set_fact:
+    build_image:
+      name: "{{ image_name }}"
+      repository: "{{ library_catalog.images.repository }}"
+      tag: "{{ image_name }}-latest"
+      build_context: "{{ project_root }}"
+      dockerfile_path: "{{ docker_root }}/{{ library_catalog.images[image_name].dockerfile }}"

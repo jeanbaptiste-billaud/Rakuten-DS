@@ -1,0 +1,41 @@
+- name: Setup MinIo
+  hosts: all
+  gather_facts: true
+
+  vars:
+    MC_CONFIG_DIR: "/tmp/.mc"
+    minio_host: "{{ lookup('ansible.builtin.env', 'MINIO_HOST') }}"
+    minio_port: "{{ lookup('ansible.builtin.env', 'MINIO_PORT') }}"
+    minio_user: "{{ lookup('ansible.builtin.env', 'MINIO_ROOT_USER') }}"
+    minio_password: "{{ lookup('ansible.builtin.env', 'MINIO_ROOT_PASSWORD') }}"
+
+  tasks:
+
+  - name: Create bucket
+    containers.podman.podman_container:
+      name: create-bucket
+      image: "{{ docker_repository }}:mc-latest"
+      rm: true
+      detach: false
+      entrypoint:
+        - /bin/sh
+        - -c
+      command: |
+        mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" &&
+          mc mb --ignore-existing local/mlflow
+      env_file : "boostrap/.env"
+
+#    - name: remove the MC config dir
+#      ansible.builtin.file:
+#        path: "{{ MC_CONFIG_DIR }}"
+#        state: absent
+#
+#    - name: Create the MC config dir
+#      ansible.builtin.file:
+#        path: "{{ MC_CONFIG_DIR }}"
+#        state: directory
+#        mode: '0755'
+#
+#    - name: Create minio alias
+#      ansible.builtin.command:
+#        cmd: "mc alias set myminio http://{{ MINIO_HOST }}:{{ MINIO_PORT }} {{ MINIO_ROOT_USER }} {{ MINIO_ROOT_PASSWORD }}"
