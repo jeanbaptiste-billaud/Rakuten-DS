@@ -1,0 +1,176 @@
+---
+- name: Initialize project Ansible Vault
+  hosts: dev
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Surchargeables avec -e si besoin.
+    ansible_vault_dir: "{{ playbook_dir }}/../../inventory/group_vars/all"
+    ansible_vault_password_file: "{{ playbook_dir }}/../../../../.vault_pass"
+    ansible_vault_file: "{{ ansible_vault_dir }}/secrets.vault.yaml"
+
+    # Protection anti-écrasement. Pour refaire le vault : -e vault_force_recreate=true
+    vault_force_recreate: false
+
+    postgres_services:
+      - name: mlflow
+        db: mlflow_db
+        user: mlflow
+      - name: airflow
+        db: airflow_db
+        user: airflow
+      - name: jenkins
+        db: jenkins_db
+        user: jenkins
+
+    services:
+      - name: minio
+        user: minio
+      - name: mlflow
+        user: mlflow
+      - name: airflow
+        user: airflow
+      - name: jenkins
+        user: admin
+
+  vars_prompt:
+    - name: vault_github_app_id
+      prompt: "GitHub App ID (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_github_client_id
+      prompt: "GitHub App Client ID (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_github_installation_id
+      prompt: "GitHub App Installation ID (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_github_private_key_path
+      prompt: "Chemin local vers la clé privée GitHub App .pem (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_dagshub_user
+      prompt: "DagsHub user (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_dagshub_password
+      prompt: "DagsHub password/token (laisser vide si non configuré)"
+      private: true
+      default: ""
+
+  tasks:
+    - name: Create vault directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0700"
+      loop:
+        - "{{ ansible_vault_dir }}"
+        - "{{ ansible_vault_password_path }}"
+
+    - name: Check vault password file
+      ansible.builtin.stat:
+        path: "{{ ansible_vault_password_file }}"
+      register: vault_password_file_info
+
+    - name: Generate vault password
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - rand
+          - -base64
+          - "48"
+      register: generated_vault_password
+      changed_when: true
+      when: not vault_password_file_info.stat.exists
+      no_log: true
+
+    - name: Write vault password file
+      ansible.builtin.copy:
+        dest: "{{ ansible_vault_password_file }}"
+        content: "{{ generated_vault_password.stdout }}\n"
+        mode: "0600"
+      when: not vault_password_file_info.stat.exists
+      no_log: true
+
+    - name: Secure vault password file
+      ansible.builtin.file:
+        path: "{{ ansible_vault_password_file }}"
+        mode: "0600"
+
+    - name: Check existing vault file
+      ansible.builtin.stat:
+        path: "{{ ansible_vault_file }}"
+      register: vault_file_info
+
+    - name: Stop if vault already exists
+      ansible.builtin.fail:
+        msg: >-
+          Le vault existe déjà : {{ ansible_vault_file }}.
+          Par sécurité, ce playbook refuse de l'écraser.
+          Relance avec -e vault_force_recreate=true si tu veux vraiment le régénérer.
+      when:
+        - vault_file_info.stat.exists
+        - not (vault_force_recreate | bool)
+
+    - name: Build services secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_service_secrets.yaml
+      loop: "{{ services }}"
+      loop_control:
+        loop_var: service
+
+    - name: Build postgres service secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_postgres_secrets.yaml
+      loop: "{{ postgres_services }}"
+      loop_control:
+        loop_var: postgres_service
+
+    - name: Build GitHub secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_github_secrets.yaml
+
+    - name: Build dagshub secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_dagshub_secrets.yaml
+
+    - name: Concat secrets
+      ansible.builtin.set_fact:
+        vault_content: >-
+          {{
+            {}
+            combine(github_secret, recursive=True)
+            | combine(dagshub_secret, recursive=True):
+            | combine(services_secrets, recursive=True)
+            | combine(postgres_secret, recursive=True)
+          }}
+      no_log: true
+
+    - name: Write plaintext vault YAML before encryption
+      ansible.builtin.copy:
+        dest: "{{ ansible_vault_file }}"
+        content: "{{ vault_content | to_nice_yaml(indent=2, sort_keys=false) }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Encrypt vault YAML file
+      ansible.builtin.command:
+        argv:
+          - ansible-vault
+          - encrypt
+          - --vault-password-file
+          - "{{ ansible_vault_password_file }}"
+          - "{{ ansible_vault_file }}"
+      changed_when: true
+      no_log: true
+
+    - name: Show created files
+      ansible.builtin.debug:
+        msg:
+          - "Vault créé : {{ ansible_vault_file }}"
+          - "Mot de passe vault local : {{ ansible_vault_password_file }}"
+          - "À ne jamais commiter : {{ ansible_vault_password_file }}"

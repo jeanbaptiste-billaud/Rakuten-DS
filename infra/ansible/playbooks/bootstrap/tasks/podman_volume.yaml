@@ -1,0 +1,16 @@
+- name: create podman volumes
+  containers.podman.podman_volume:
+    name: "{{ item.value }}"
+    recreate: false
+  loop: "{{ docker_volumes | dict2items }}"
+  register: podman_volumes
+
+- name: Build volume mountpoints dict
+  ansible.builtin.set_fact:
+    volume_mountpoints: >-
+      {{
+        volume_mountpoints | default({}) |
+        combine({ item.item.key: item.volume.Mountpoint })
+      }}
+  loop: "{{ podman_volumes.results }}"
+  no_log: true

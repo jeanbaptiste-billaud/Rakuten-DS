@@ -1,0 +1,51 @@
+- name: Bootstrap pre-vault
+  hosts: deploy
+  gather_facts: false
+
+  vars_prompt:
+    - name: bitwarden_master_password
+      prompt: "Bitwarden master password"
+      private: true
+
+  vars:
+    bitwarden_email: "billaud.jeanbaptiste@gmail.com"
+
+  tasks:
+  - name: Unlock Bitwarden vault
+    ansible.builtin.command:
+      cmd: bw unlock --passwordenv BW_PASSWORD --raw
+    environment:
+      BW_PASSWORD: "{{ bitwarden_master_password }}"
+    register: bw_unlock
+    no_log: true
+
+  - name: Create temporary vault password file in RAM
+    ansible.builtin.copy:
+      dest: /dev/shm/ansible_vault_pass
+      content: "{{ lookup('ansible.builtin.pipe', 'bw get password ANSIBLE_VAULT_PASSWORD --session ' ~ bw_unlock.stdout) }}"
+      mode: "0600"
+    no_log: true
+
+  - name: Launch restore playbook with Ansible Vault password
+    ansible.builtin.command:
+      argv:
+        - ansible-playbook
+        - -i
+        - infra/ansible/inventory/hosts.ini
+        - infra/ansible/playbooks/bootstrap_restore.yaml
+        - --vault-password-file
+        - /dev/shm/ansible_vault_pass
+    no_log: false
+
+  - name: Remove temporary vault password file
+    ansible.builtin.file:
+      path: /dev/shm/ansible_vault_pass
+      state: absent
+    no_log: true
+
+  - name: Lock Bitwarden vault
+    ansible.builtin.command:
+      cmd: bw lock
+    failed_when: false
+    changed_when: false
+    no_log: true

@@ -1,0 +1,28 @@
+---
+docker_images:
+  api-gateway:
+    image: "{{ docker_repository }}:api-gateway-latest"
+  auth-service:
+    image: "{{ docker_repository }}:auth-service-latest"
+  bentoml:
+    image: "{{ docker_repository }}:bentoml-latest"
+  drift-detector:
+    image: "{{ docker_repository }}:drift-detector-latest"
+  dvc:
+    image: "{{ docker_repository }}:dvc-latest"
+  minio-client:
+    image: "{{ docker_repository }}:minio-client-latest"
+  mlflow:
+    image: "{{ docker_repository }}:mlflow-latest"
+  spacy:
+    image: "{{ docker_repository }}:spacy-latest"
+  trainer:
+    image: "{{ docker_repository }}:trainer-latest"
+  streamlit:
+    image: "{{ docker_repository }}:streamlit-latest"
+  airflow:
+    image: "{{ docker_repository }}:airflow-latest"
+  postgres:
+    image: dhi.io/postgres:18
+
+workdir: "/app"

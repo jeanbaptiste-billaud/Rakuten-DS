@@ -1,0 +1,9 @@
+# bootstrap/dvc_pull_list.yaml
+---
+dvc_targets:
+  - data/raw/all_raw_data.csv.dvc
+  - data/preprocessed.dvc
+  - data/dataset.dvc
+  - data/mlflow-artifacts.dvc
+  - data/pg_backups.dvc
+  - data/logs_and_reports.tar.gz.dvc

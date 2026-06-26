@@ -1,0 +1,23 @@
+  - name: Install snapd
+    ansible.builtin.package:
+      name: snapd
+      state: present
+
+  - name: Enable and start snapd socket
+    ansible.builtin.systemd:
+      name: snapd.socket
+      state: started
+      enabled: true
+
+  # On some distros, you need the classic snap symlink
+  - name: Create symlink for classic snap support
+    ansible.builtin.file:
+      src: /var/lib/snapd/snap
+      dest: /snap
+      state: link
+    when: ansible_facts['os_family'] != "Debian"
+
+  - name: Wait for snapd to be ready
+    ansible.builtin.command:
+      cmd: snap wait system seed.loaded
+    changed_when: false

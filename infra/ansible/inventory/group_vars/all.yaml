@@ -1,42 +1,13 @@
 ---
-python_version: "3.12.*"
-
-pixi_path:
-  pixi_home: "{{ ansible_facts.env.HOME }}/.pixi"
-  pixi_bin_path: "{{ ansible_facts.env.HOME }}/.pixi/bin"
-
 docker_registry: "docker.io"
 docker_namespace: "jbbillaud"
 docker_project: "rakuten"
 
 docker_repository: "{{ docker_registry }}/{{ docker_namespace }}/{{ docker_project }}"
 
-#docker_image_defaults:
-#  repository: "docker.io/jbbillaud/rakuten"
-#  build_context: "{{ project_root }}"
+docker_volumes:
+  dvc: "dvc_data"
+  postgres: "pgdata"
+  logs: "logs_and_reports"
 
-docker_images:
-  api-gateway:
-    image: "{{ docker_repository }}:api-gateway-latest"
-  auth-service:
-    image: "{{ docker_repository }}:auth-service-latest"
-  bentoml:
-    image: "{{ docker_repository }}:bentoml-latest"
-  drift-detector:
-    image: "{{ docker_repository }}:drift-detector-latest"
-  dvc:
-    image: "{{ docker_repository }}:dvc-latest"
-  minio-client:
-    image: "{{ docker_repository }}:minio-client-latest"
-  mlflow:
-    image: "{{ docker_repository }}:mlflow-latest"
-  spacy:
-    image: "{{ docker_repository }}:spacy-latest"
-  trainer:
-    image: "{{ docker_repository }}:trainer-latest"
-  streamlit:
-    image: "{{ docker_repository }}:streamlit-latest"
-  airflow:
-    image: "{{ docker_repository }}:airflow-latest"
-
-workdir: "/app"
+docker_network: "rakuten_network"

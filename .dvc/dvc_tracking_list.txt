@@ -1,7 +1,0 @@
-# bootstrap/dvc_pull_list.txt
-data/raw/all_raw_data.csv.dvc
-data/preprocessed.dvc
-data/dataset.dvc
-data/mlflow-artifacts.dvc
-data/mlflow_db.tar.gz.dvc
-data/logs_and_reports.tar.gz.dvc

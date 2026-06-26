@@ -1,0 +1,130 @@
+#bootstrap.yml
+#│
+#├── postgres
+#│   ├── start postgres
+#│   ├── restore databases
+#│   └── validate restore
+#│
+#├── minio
+#│   ├── create buckets
+#│   ├── create users
+#│   └── upload initial datasets
+#│
+#└── validation
+#    ├── healthchecks
+#    └── smoke tests
+---
+
+- name: Bootstrap Rakuten environment
+  hosts: deploy
+  gather_facts: true
+
+  vars:
+    repo_name: Rakuten-DS
+    repo_branch: dvc
+    repo_url: https://github.com/jeanbaptiste-billaud/Rakuten-DS.git
+
+  vars_files:
+    - ../../inventory/group_vars/vault.yml
+
+  tasks:
+    - name: Create podman volumes
+      include_tasks: "tasks/podman_volume.yaml"
+
+    - name: Create Podman network
+      containers.podman.podman_network:
+        name: "{{ docker_network }}"
+        state: present
+
+    - name: git
+      block:
+        - name: Check if DVC repo exists
+          ansible.builtin.stat:
+            path: "{{ volume_mountpoints.dvc }}/.git"
+          register: dvc_repo
+
+        - name: clone repository
+          containers.podman.podman_container:
+            name: dvc
+            image: "{{ docker_images.dvc.image }}"
+            rm: true
+            recreate: true
+            detach: false
+            workdir: "{{ workdir }}/dvc_data"
+            volumes:
+              - "dvc_data:{{ workdir }}/dvc_data"
+            command: "git clone --branch {{ repo_branch }} --single-branch {{ repo_url }} ."
+          when: not dvc_repo.stat.exists
+
+    - name: dvc
+      block:
+        - name: setup dagshub repo
+          containers.podman.podman_container:
+            image: "{{ docker_images.dvc.image }}"
+            name: dvc
+            rm: true
+            recreate: true
+            detach: false
+            workdir: "{{ workdir }}/dvc_data"
+            volumes:
+              - "dvc_data:{{ workdir }}/dvc_data"
+            command:
+              - sh
+              - -c
+              - |
+                set -e
+                
+                dvc remote modify origin --local auth basic
+                dvc remote modify origin --local user "{{ dagshub.user }}"
+                dvc remote modify origin --local password "{{ dagshub.password }}"
+          no_log: true
+
+        - name: Find dvc files
+          ansible.builtin.include_vars:
+            file: "{{ volume_mountpoints.dvc }}/.dvc/dvc_tracking_list.yaml"
+
+        - name: pull dvc data
+          containers.podman.podman_container:
+            name: dvc
+            image: "{{ docker_images.dvc.image }}"
+            rm: true
+            recreate: true
+            detach: false
+            workdir: "{{ workdir }}/dvc_data"
+            volumes:
+              - "dvc_data:{{ workdir }}/dvc_data"
+            command: "dvc pull {{ item }}"
+          loop: "{{ dvc_targets }}" # nom de la variable du fichier yaml
+
+        - name: remove dvc local config file
+          containers.podman.podman_container:
+            image: "{{ docker_images.dvc.image }}"
+            name: dvc
+            rm: true
+            recreate: true
+            detach: false
+            workdir: "{{ workdir }}/dvc_data"
+            volumes:
+              - "dvc_data:{{ workdir }}/dvc_data"
+            command:
+              - sh
+              - -c
+              - rm -f .dvc/config.local
+
+    - name: pgsql
+      block:
+        - name: Create postgres admin role
+          containers.podman.podman_container:
+            image: "{{ docker_images.postgres.image }}"
+            name: postgres
+            state: started
+            volumes:
+              - pgdata:/var/lib/postgresql/data
+              - dvc_data:/dvc_data
+            env:
+              POSTGRES_USER: "{{ postgres.root.user }}"
+              POSTGRES_PASSWORD: "{{ postgres.root.password }}"
+              POSTGRES_DB: postgres
+            networks:
+              - name: "{{ docker_network }}"
+

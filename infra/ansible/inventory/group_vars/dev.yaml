@@ -1,0 +1,10 @@
+---
+python_version: "3.12.*"
+
+pixi_path:
+  pixi_home: "{{ ansible_facts.env.HOME }}/.pixi"
+  pixi_bin_path: "{{ ansible_facts.env.HOME }}/.pixi/bin"
+
+ansible_vault_password_path: "~/.config/rakuten"
+ansible_vault_password: "{{ ansible_vault_password_path }}/.vault_password"
+ansible_vault_file: "infra/ansible/inventory/group_vars/all/vault.yml"

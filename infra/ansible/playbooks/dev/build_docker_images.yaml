@@ -1,5 +1,5 @@
 - name: setup env and build docker images
-  hosts: all
+  hosts: dev
   gather_facts: true
 
   tasks:

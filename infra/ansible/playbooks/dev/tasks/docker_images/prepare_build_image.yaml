@@ -6,4 +6,5 @@
       repository: "{{ library_catalog.images.repository }}"
       tag: "{{ image_name }}-latest"
       build_context: "{{ project_root }}"
+      dockerfile_root: "docker/{{ image_name }}"
       dockerfile_path: "{{ docker_root }}/{{ library_catalog.images[image_name].dockerfile }}"

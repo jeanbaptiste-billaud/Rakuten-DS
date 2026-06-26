@@ -12,8 +12,12 @@
       file: "{{ build_image.dockerfile_path }}"
       force_rm: true
       extra_args : >-
-        --build-arg PIXI_ENV="{{ build_image.name }}"
+        --build-arg PIXI_ENV="{{ build_image.name }}" 
         --build-arg PIXI_CATALOG_DIR="{{ catalog_dir_from_context }}"
+        --build-arg DVC_VOLUME_DIR="{{ docker_volumes.dvc }}"
+        --build-arg POSTGRES_VOLUME_DIR="{{ docker_volumes.postgres }}"
+        --build-arg LOGS_VOLUME_DIR="{{ docker_volumes.logs }}"
+        --build-arg DOCKERFILE_ROOT="{{ build_image.dockerfile_root }}"
     force: "{{ force_rebuild | default(false) }}"
     push: "{{ push | default(true) }}"
   environment:

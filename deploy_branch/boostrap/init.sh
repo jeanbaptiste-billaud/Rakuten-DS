@@ -69,7 +69,7 @@ docker compose -f "${COMPOSE_FILE}" run --rm \
     if [[ ! -d "'"${REPO_NAME}"'" ]]; then
       echo "[DVC] Cloning repo (private) ..."
       # Clone avec token via HTTPS
-      git clone --branch '"${BRANCH_NAME}"' --single-branch \
+      git clone --branch '"${BRANCH_NAME}"' --single-branch \           
         "https://"'${GITHUB_TOKEN}'"@'"${REPO_HTTPS}"'"
     else
       echo "[DVC] Repo already present, skipping clone."
