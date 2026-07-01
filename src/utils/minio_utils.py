@@ -22,6 +22,11 @@ def minio_bucket_connect(bucket_name: str):
     endpoint = endpoint.removeprefix("http://")
     access_key = os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID")
     secret_key = os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
+    if not access_key or not secret_key:
+        raise RuntimeError(
+            "MinIO credentials are missing. Expected MINIO_ACCESS_KEY/MINIO_SECRET_KEY "
+            "or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY to be injected by Infisical."
+        )
 
     client = Minio(endpoint=endpoint,
                    access_key=access_key,

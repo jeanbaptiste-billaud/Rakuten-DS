@@ -1,4 +1,10 @@
+ARG INFISICAL_CLI_IMAGE=docker.io/infisical/cli:latest
+
+FROM ${INFISICAL_CLI_IMAGE} AS infisical-cli
+
 FROM dhi.io/debian-base:trixie-debian13-dev
+
+COPY --from=infisical-cli /bin/infisical /usr/local/bin/infisical
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

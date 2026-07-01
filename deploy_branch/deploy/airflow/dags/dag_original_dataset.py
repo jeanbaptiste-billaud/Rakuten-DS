@@ -1,7 +1,13 @@
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sdk import timezone, dag
 
-from common_task import start_pipeline_task, end_pipeline_task, preprocess_task, docker_common_args
+from common_task import (
+    docker_common_args,
+    end_pipeline_task,
+    infisical_run_command,
+    preprocess_task,
+    start_pipeline_task,
+)
 
 
 # =============================================================================
@@ -9,20 +15,22 @@ from common_task import start_pipeline_task, end_pipeline_task, preprocess_task,
 # =============================================================================
 
 def dataset_task():
-    common_args = docker_common_args()
+    identity = "data-ingestion-id"
+    common_args = docker_common_args(identity)
+    script = """
+        echo "⬇️ Downloading inputs..." &&
+        python /src/utils/sync_bucket.py raw --mode pull &&
+
+        echo "⚙️ Generate original dataset..." &&
+        python /src/make_original_dataset.py &&
+
+        echo "⬆️ Uploading results..." &&
+        python /src/utils/sync_bucket.py dataset --mode push
+    """
     return DockerOperator(
         task_id='create_dataset',
         image="jbbillaud/rakuten:spacy-v3.8.11",
-        command="""sh -c '
-            echo "⬇️ Downloading inputs..." &&
-            python /src/utils/sync_bucket.py raw --mode pull &&
-
-            echo "⚙️ Generate original dataset..." &&
-            python /src/make_original_dataset.py &&
-
-            echo "⬆️ Uploading results..." &&
-            python /src/utils/sync_bucket.py dataset --mode push
-        '""",
+        command=infisical_run_command(script, identity),
         **common_args
     )
 

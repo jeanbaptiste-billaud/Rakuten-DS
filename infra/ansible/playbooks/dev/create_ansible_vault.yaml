@@ -41,6 +41,24 @@
       - name: jenkins
         user: admin
 
+    minio_service_account_definitions:
+      - name: data_ingestion
+        access_key: data-ingestion-id
+      - name: data_enrichment
+        access_key: data-enrichment-id
+      - name: data_preprocessing
+        access_key: data-preprocessing-id
+      - name: training
+        access_key: training-id
+      - name: mlflow_server
+        access_key: mlflow-server-id
+      - name: model_evaluation
+        access_key: model-evaluation-id
+      - name: model_build
+        access_key: model-build-id
+      - name: backup
+        access_key: backup-id
+
   vars_prompt:
     - name: vault_github_app_id
       prompt: "GitHub App ID (laisser vide si non configuré)"
@@ -153,6 +171,12 @@
       loop_control:
         loop_var: postgres_service
 
+    - name: Build MinIO service account secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_minio_service_accounts.yaml
+      loop: "{{ minio_service_account_definitions }}"
+      loop_control:
+        loop_var: minio_service_account
+
     - name: Build GitHub secrets
       ansible.builtin.include_tasks: tasks/ansible_vault/create_github_secrets.yaml
 
@@ -175,6 +199,7 @@
             | combine(docker_hub_secret, recursive=True)
             | combine(services_secrets, recursive=True)
             | combine(postgres_secrets, recursive=True)
+            | combine(minio_service_account_secrets, recursive=True)
             | combine(infisical_secret, recursive=True)
           }}
       no_log: true

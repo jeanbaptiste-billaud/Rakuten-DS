@@ -10,7 +10,12 @@ from airflow.providers.standard.operators.python import BranchPythonOperator
 from airflow.sdk import timezone, dag, task, task_group
 from docker.types import Mount
 
-from common_task import start_pipeline_task, end_pipeline_task, docker_common_args
+from common_task import (
+    docker_common_args,
+    end_pipeline_task,
+    infisical_run_command,
+    start_pipeline_task,
+)
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
@@ -40,8 +45,11 @@ def lineage_task():
 
 
 def training_task():
-    common_args = docker_common_args()
-    common_args["environment"]["DRIFT_DETECTOR_URL"] = os.getenv("DRIFT_DETECTOR_URL")
+    identity = "training-id"
+    common_args = docker_common_args(
+        identity,
+        extra_environment={"DRIFT_DETECTOR_URL": os.getenv("DRIFT_DETECTOR_URL", "")},
+    )
     script = textwrap.dedent(f"""\
         echo "⬇️ Downloading preprocessed data..."
         python /src/utils/sync_bucket.py preprocessed --mode pull
@@ -58,22 +66,24 @@ def training_task():
         task_id="train_model",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
-        command=["sh", "-lc", script],
+        command=infisical_run_command(script, identity),
         **common_args,
     )
 
 
 def build_model_task():
-    common_args = docker_common_args()
+    identity = "model-build-id"
+    common_args = docker_common_args(identity)
+    script = """
+        set -e
+        . /venv/bin/activate
+        sh /model_serving/model_building.sh
+    """
     return DockerOperator(
         task_id="build_model",
         image="jbbillaud/rakuten:bentoml-v1.4.33",
         user=f"{os.getenv('AIRFLOW_UID', 5000)}:{os.getenv('DOCKER_GID', 1001)}",
-        command=["sh", "-lc", """
-            set -e
-            . /venv/bin/activate
-            sh /model_serving/model_building.sh
-            """],
+        command=infisical_run_command(script, identity),
         mounts=[Mount(source="/var/run/docker.sock", target="/var/run/docker.sock", type="bind"),
                 Mount(source="airflow_vol", target=WORKDIR, type="volume")],
         **common_args,
@@ -115,13 +125,16 @@ def get_model_run_id_task():
 
 
 def model_comparison_task():
-    common_args = docker_common_args()
-    common_args["environment"]["MODEL_RUN_ID"] = "{{ ti.xcom_pull(task_ids='get_model_run_id_task') }}"
+    identity = "model-evaluation-id"
+    common_args = docker_common_args(
+        identity,
+        extra_environment={"MODEL_RUN_ID": "{{ ti.xcom_pull(task_ids='get_model_run_id_task') }}"},
+    )
     return DockerOperator(
         task_id="model_comparison",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
         mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
-        command=["sh", "-lc", "python /src/model_promotion_decision.py"],
+        command=infisical_run_command("python /src/model_promotion_decision.py", identity),
         do_xcom_push=True,
         **common_args
     )

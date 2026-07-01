@@ -23,24 +23,17 @@ run_id_path = os.path.join(ROOT_PATH, "run_id.json")
 MLFLOW_EXPERIMENT_NAME = "text_classification_svm"
 DRIFT_DETECTOR_URL = os.getenv("DRIFT_DETECTOR_URL", "http://localhost:8003")
 
-if not os.getenv("MLFLOW_S3_ENDPOINT_URL"):
-    os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://localhost:9000"
-
-if not os.getenv("AWS_ACCESS_KEY_ID"):
-    os.environ["AWS_ACCESS_KEY_ID"] = "minio"
-
-if not os.getenv("AWS_SECRET_ACCESS_KEY"):
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
+for required_env in ["MLFLOW_S3_ENDPOINT_URL", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]:
+    if not os.getenv(required_env):
+        raise RuntimeError(f"{required_env} must be injected by Infisical")
 
 # --- Initialisation MLflow ---
 mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
 if mlflow_uri:
     print(f"[INFO] Using MLflow tracking URI from env: {mlflow_uri}")
-else:
-    # Fallback par défaut (utile pour exécution locale)
-    mlflow_uri = "http://localhost:5000"
-    print(f"[INFO] MLFLOW_TRACKING_URI not set — using default: {mlflow_uri}")
     mlflow.set_tracking_uri(mlflow_uri)
+else:
+    raise RuntimeError("MLFLOW_TRACKING_URI must be injected by Infisical")
 
 mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 

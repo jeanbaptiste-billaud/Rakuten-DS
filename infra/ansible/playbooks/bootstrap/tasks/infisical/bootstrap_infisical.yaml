@@ -7,6 +7,8 @@
       # MinIO already stores Docker-compatible environment variable names.
       - prefix: ""
         data: "{{ minio | default({}) }}"
+      - prefix: MINIO
+        data: "{{ minio_service_accounts | default({}) }}"
       - prefix: MLFLOW
         data: "{{ mlflow | default({}) }}"
       - prefix: AIRFLOW
@@ -17,6 +19,17 @@
         data: "{{ dagshub | default({}) }}"
       - prefix: GITHUB_APP
         data: "{{ github_app | default({}) }}"
+  no_log: true
+
+- name: Build Infisical runtime workload secrets
+  ansible.builtin.set_fact:
+    infisical_runtime_secrets: >-
+      {{
+        lookup(
+          'ansible.builtin.template',
+          playbook_dir ~ '/tasks/infisical/templates/runtime_secrets.yaml.j2'
+        ) | from_yaml | default([], true)
+      }}
   no_log: true
 
 - name: Build Infisical seed secrets
@@ -211,8 +224,8 @@
       '--domain',
       infisical.site_url,
       '--path',
-      infisical.bootstrap.secret_path
+      item.path | default(infisical.bootstrap.secret_path)
     ] }}"
-  loop: "{{ infisical_seed_secrets }}"
+  loop: "{{ infisical_seed_secrets + infisical_runtime_secrets }}"
   when: item.value | string | length > 0
   no_log: true

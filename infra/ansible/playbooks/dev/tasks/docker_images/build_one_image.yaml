@@ -18,6 +18,7 @@
         --build-arg POSTGRES_VOLUME_DIR="{{ docker_volumes.postgres }}"
         --build-arg LOGS_VOLUME_DIR="{{ docker_volumes.logs }}"
         --build-arg DOCKERFILE_ROOT="{{ build_image.dockerfile_root }}"
+        --build-arg INFISICAL_CLI_IMAGE="{{ infisical_cli_image }}"
     force: "{{ force_rebuild | default(false) }}"
     push: "{{ push | default(true) }}"
   environment:

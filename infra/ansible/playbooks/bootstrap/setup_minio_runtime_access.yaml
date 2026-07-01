@@ -1,0 +1,140 @@
+---
+- name: Setup MinIO runtime access for V2 workloads
+  hosts: deploy
+  gather_facts: true
+
+  vars:
+    minio_read_actions:
+      - s3:GetObject
+      - s3:ListBucket
+    minio_write_actions:
+      - s3:GetObject
+      - s3:PutObject
+      - s3:DeleteObject
+      - s3:ListBucket
+
+    minio_runtime_accounts:
+      - name: data-ingestion
+        access_key: "{{ minio_service_accounts.data_ingestion.access_key }}"
+        secret_key: "{{ minio_service_accounts.data_ingestion.secret_key }}"
+        policy_name: rakuten-data-ingestion
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - arn:aws:s3:::raw
+                - arn:aws:s3:::raw/*
+            - Effect: Allow
+              Action: "{{ minio_write_actions }}"
+              Resource:
+                - arn:aws:s3:::dataset
+                - arn:aws:s3:::dataset/*
+      - name: data-enrichment
+        access_key: "{{ minio_service_accounts.data_enrichment.access_key }}"
+        secret_key: "{{ minio_service_accounts.data_enrichment.secret_key }}"
+        policy_name: rakuten-data-enrichment
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - arn:aws:s3:::raw
+                - arn:aws:s3:::raw/*
+            - Effect: Allow
+              Action: "{{ minio_write_actions }}"
+              Resource:
+                - arn:aws:s3:::dataset
+                - arn:aws:s3:::dataset/*
+      - name: data-preprocessing
+        access_key: "{{ minio_service_accounts.data_preprocessing.access_key }}"
+        secret_key: "{{ minio_service_accounts.data_preprocessing.secret_key }}"
+        policy_name: rakuten-data-preprocessing
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - arn:aws:s3:::dataset
+                - arn:aws:s3:::dataset/*
+            - Effect: Allow
+              Action: "{{ minio_write_actions }}"
+              Resource:
+                - arn:aws:s3:::preprocessed
+                - arn:aws:s3:::preprocessed/*
+      - name: training
+        access_key: "{{ minio_service_accounts.training.access_key }}"
+        secret_key: "{{ minio_service_accounts.training.secret_key }}"
+        policy_name: rakuten-training
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - arn:aws:s3:::preprocessed
+                - arn:aws:s3:::preprocessed/*
+            - Effect: Allow
+              Action: "{{ minio_write_actions }}"
+              Resource:
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}"
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}/*"
+      - name: mlflow-server
+        access_key: "{{ minio_service_accounts.mlflow_server.access_key }}"
+        secret_key: "{{ minio_service_accounts.mlflow_server.secret_key }}"
+        policy_name: rakuten-mlflow-server
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_write_actions }}"
+              Resource:
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}"
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}/*"
+      - name: model-evaluation
+        access_key: "{{ minio_service_accounts.model_evaluation.access_key }}"
+        secret_key: "{{ minio_service_accounts.model_evaluation.secret_key }}"
+        policy_name: rakuten-model-evaluation
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}"
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}/*"
+      - name: model-build
+        access_key: "{{ minio_service_accounts.model_build.access_key }}"
+        secret_key: "{{ minio_service_accounts.model_build.secret_key }}"
+        policy_name: rakuten-model-build
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}"
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}/*"
+      - name: backup
+        access_key: "{{ minio_service_accounts.backup.access_key }}"
+        secret_key: "{{ minio_service_accounts.backup.secret_key }}"
+        policy_name: rakuten-backup
+        policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: "{{ minio_read_actions }}"
+              Resource:
+                - arn:aws:s3:::dataset
+                - arn:aws:s3:::dataset/*
+                - arn:aws:s3:::preprocessed
+                - arn:aws:s3:::preprocessed/*
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}"
+                - "arn:aws:s3:::{{ minio_mlflow_bucket | default('mlflow-artifacts') }}/*"
+
+  tasks:
+    - name: Create MinIO runtime users and policies
+      ansible.builtin.include_tasks: tasks/minio/setup_runtime_access.yaml

@@ -8,7 +8,7 @@ mkdir -p "$MC_CONFIG_DIR"
 set +e
 
 echo "🔗 Configuration de l'alias MinIO..."
-mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
+mc alias set myminio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
 
 BUCKETS_LIST=("dataset" "preprocessed", ${MINIO_MLFLOW_BUCKET})
 

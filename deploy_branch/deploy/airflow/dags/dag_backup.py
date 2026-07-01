@@ -5,7 +5,14 @@ from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sdk import timezone, dag
 from docker.types import Mount
 
-from common_task import start_pipeline_task, end_pipeline_task, volume_backup_task, docker_common_args, pg_dump_task
+from common_task import (
+    docker_common_args,
+    end_pipeline_task,
+    infisical_run_command,
+    pg_dump_task,
+    start_pipeline_task,
+    volume_backup_task,
+)
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
@@ -14,13 +21,16 @@ WORKDIR = os.getenv("WORKDIR", "/app")
 
 
 def minio_backup_task():
-    common_args = docker_common_args()
-    common_args["environment"]["MINIO_MLFLOW_BUCKET"] = os.getenv("MINIO_MLFLOW_BUCKET", "mlflow-artifacts")
+    identity = "backup-id"
+    common_args = docker_common_args(
+        identity,
+        extra_environment={"MINIO_MLFLOW_BUCKET": os.getenv("MINIO_MLFLOW_BUCKET", "mlflow-artifacts")},
+    )
     return DockerOperator(
         task_id='backup_minio_volume',
         image="jbbillaud/rakuten:minio-client-RELEASE.2025-08-13T08-35-41Z",
         mounts=[Mount(source="dvc_data", target="/dvc_data", type="volume")],
-        command="/src/minio_backup.sh > /proc/1/fd/1 2>&1",
+        command=infisical_run_command("/src/minio_backup.sh > /proc/1/fd/1 2>&1", identity),
         doc_md="""
         ### 🐳 Docker task
         - Lance un conteneur minio-client
@@ -31,13 +41,14 @@ def minio_backup_task():
 
 
 def commit_task():
-    common_args = docker_common_args()
+    identity = "dvc-publisher-id"
+    common_args = docker_common_args(identity)
     repo = f"{WORKDIR}/dvc_data/Rakuten-DS"
     return DockerOperator(
         task_id='git_dvc_commit',
         image='jbbillaud/rakuten:dvc-v3.66.1',
         mounts=[Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume")],
-        command=f"""
+        command=infisical_run_command(f"""
         sh -c "set -e
         cd '{repo}'
 
@@ -47,7 +58,7 @@ def commit_task():
         
         # Lire la liste de tracking (en supprimant CRLF + vides + commentaires)
         sed -i 's/\\r$//' .dvc/dvc_tracking_list.txt
-        TRACKED_PATHS=$(grep -vE '^\s*($|#)' .dvc/dvc_tracking_list.txt | sed 's/\.dvc$//' | sort -u || true)
+        TRACKED_PATHS=$(grep -vE '^\\s*($|#)' .dvc/dvc_tracking_list.txt | sed 's/\\.dvc$//' | sort -u || true)
 
         if [ -z "$TRACKED_PATHS" ]; then
           echo '[DVC] tracking list empty -> nothing to do'
@@ -69,7 +80,7 @@ def commit_task():
         git push origin dvc
         dvc push
         "
-        """,
+        """, identity),
         doc_md="""
         ### 🐳 Docker task
         - lit `.dvc/dvc_tracking_list.txt` (CRLF safe)
@@ -80,9 +91,6 @@ def commit_task():
         **common_args,
     )
 
-
-pguser = "{{ conn.postgres_default.login }}"
-pgpwd = "{{ conn.postgres_default.password }}"
 
 # =============================================================================
 # 🚀 DÉFINITION DU DAG
@@ -104,8 +112,8 @@ default_args = {
 def backup_pipeline_dag():
     start = start_pipeline_task()
 
-    backup_mlflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "mlflow_db"), "mlflow", "mlflow")
-    backup_airflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "airflow_db"), "mlflow", "mlflow")
+    backup_mlflow_db = pg_dump_task(os.getenv("MLFLOW_DB", "mlflow_db"))
+    backup_airflow_db = pg_dump_task(os.getenv("AIRFLOW_DB", "airflow_db"))
     backup_logs_and_reports = volume_backup_task("logs_and_reports")
     backup_minio_volume = minio_backup_task()
     commit = commit_task()

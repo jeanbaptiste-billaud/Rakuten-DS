@@ -1,4 +1,8 @@
 # ---------- Builder ----------
+ARG INFISICAL_CLI_IMAGE=docker.io/infisical/cli:latest
+
+FROM ${INFISICAL_CLI_IMAGE} AS infisical-cli
+
 FROM docker.io/jbbillaud/rakuten:pixi-latest AS builder
 
 WORKDIR /app
@@ -27,6 +31,7 @@ COPY --from=builder /opt/pixi /opt/pixi
 COPY --from=builder /app/.pixi /app/.pixi
 COPY --from=builder /app/pixi.toml /app/pixi.toml
 COPY --from=builder /app/pixi.lock /app/pixi.lock
+COPY --from=infisical-cli /bin/infisical /usr/local/bin/infisical
 
 # Code du service d'auth
 COPY docker/${PIXI_ENV}/service.py app.py
