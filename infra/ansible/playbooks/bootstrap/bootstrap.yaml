@@ -24,9 +24,6 @@
     repo_branch: dvc
     repo_url: https://github.com/jeanbaptiste-billaud/Rakuten-DS.git
 
-  vars_files:
-    - ../../inventory/group_vars/vault.yml
-
   tasks:
     - name: Create podman volumes
       include_tasks: "tasks/podman_volume.yaml"

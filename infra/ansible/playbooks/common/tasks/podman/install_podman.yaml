@@ -1,0 +1,63 @@
+---
+- name: Install Podman
+  ansible.builtin.apt:
+    name:
+      - podman
+      - uidmap
+      - slirp4netns
+      - fuse-overlayfs
+      - golang-github-containernetworking-plugin-dnsname
+      - podman-compose
+    state: present
+    update_cache: true
+    install_recommends: false
+
+- name: Create containers registries config directory
+  ansible.builtin.file:
+    path: /etc/containers/registries.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure Docker Hub as default registry
+  ansible.builtin.copy:
+    dest: /etc/containers/registries.conf.d/00-docker-hub.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      unqualified-search-registries = ["{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"]
+
+- name: Check Docker Hub credentials are defined
+  ansible.builtin.assert:
+    that:
+      - docker_hub is defined
+      - docker_hub.username is defined
+      - docker_hub.username | length > 0
+      - docker_hub.password is defined
+      - docker_hub.password | length > 0
+    fail_msg: "Docker Hub credentials must be defined as docker_hub.username and docker_hub.password."
+  no_log: true
+
+- name: Create containers config directory for Ansible user
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.config/containers"
+    state: directory
+    mode: "0700"
+  become: false
+
+- name: Login to Docker Hub with Podman
+  containers.podman.podman_login:
+    registry: "{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"
+    username: "{{ docker_hub.username }}"
+    password: "{{ docker_hub.password }}"
+    authfile: "{{ ansible_user_dir }}/.config/containers/auth.json"
+  become: false
+  no_log: true
+
+- name: Secure Podman registry auth file
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.config/containers/auth.json"
+    mode: "0600"
+  become: false

@@ -1,0 +1,21 @@
+---
+- name: Setup Infisical
+  hosts: deploy
+  connection: local
+  gather_facts: true
+
+  vars:
+    infisical_install_host_cli: true
+    infisical_cli_command:
+      - infisical
+
+  tasks:
+    - name: Setup Infisical service
+      ansible.builtin.include_tasks: tasks/infisical/setup_infisical.yaml
+
+    - name: Install Infisical CLI
+      ansible.builtin.include_tasks: tasks/infisical/install_infisical_cli.yaml
+      when: infisical_install_host_cli | bool
+
+    - name: Bootstrap and seed Infisical
+      ansible.builtin.include_tasks: tasks/infisical/bootstrap_infisical.yaml

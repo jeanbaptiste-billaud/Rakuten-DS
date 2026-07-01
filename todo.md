@@ -19,9 +19,3 @@
     - deploy
     - Healthcheck
 
-
-- ZenML
-  - découper entraînement en steps propres
-  - gérer train / evaluate / compare
-  - logger vers MLflow
-  - produire un modèle candidat

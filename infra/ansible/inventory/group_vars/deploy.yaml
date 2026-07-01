@@ -24,5 +24,9 @@ docker_images:
     image: "{{ docker_repository }}:airflow-latest"
   postgres:
     image: dhi.io/postgres:18
+  redis:
+    image: docker.io/library/redis:7-alpine
+  infisical:
+    image: docker.io/infisical/infisical:latest-postgres
 
 workdir: "/app"

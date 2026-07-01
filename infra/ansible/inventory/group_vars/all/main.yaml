@@ -1,0 +1,16 @@
+---
+docker_registry: "docker.io"
+docker_namespace: "jbbillaud"
+docker_project: "rakuten"
+
+docker_repository: "{{ docker_registry }}/{{ docker_namespace }}/{{ docker_project }}"
+
+docker_volumes:
+  dvc: "dvc_data"
+  postgres: "pgdata"
+  logs: "logs_and_reports"
+  redis: "redis_data"
+
+docker_network: "rakuten_network"
+
+ansible_vault_file: "{{ inventory_dir }}/group_vars/all/secrets.vault.yaml"

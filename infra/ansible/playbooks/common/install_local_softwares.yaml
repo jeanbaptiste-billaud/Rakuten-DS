@@ -4,15 +4,11 @@
 - name: Install local softwares
   hosts: all
   gather_facts: true
+  become: true
 
   tasks:
-    - name: Install Podman
-      ansible.builtin.apt:
-        name:
-          - podman
-        state: present
-        update_cache: true
-        install_recommends: false
+    - name: Install and configure Podman
+      ansible.builtin.include_tasks: tasks/podman/install_podman.yaml
 
     - name: Install snap
       ansible.builtin.include_tasks: tasks/utils/install_snap.yaml

@@ -6,14 +6,18 @@
 
   vars:
     # Surchargeables avec -e si besoin.
-    ansible_vault_dir: "{{ playbook_dir }}/../../inventory/group_vars/all"
-    ansible_vault_password_file: "{{ playbook_dir }}/../../../../.vault_pass"
-    ansible_vault_file: "{{ ansible_vault_dir }}/secrets.vault.yaml"
+    ansible_vault_password_file: "{{ lookup('ansible.builtin.config', 'DEFAULT_VAULT_PASSWORD_FILE') }}"
 
-    # Protection anti-écrasement. Pour refaire le vault : -e vault_force_recreate=true
+    # Par défaut, ce playbook complète le vault existant sans régénérer
+    # les secrets déjà présents. Passe vault_force_recreate=true pour
+    # volontairement remplacer toutes les valeurs gérées par ce playbook.
     vault_force_recreate: false
 
     postgres_services:
+      - name: root
+        user: postgres
+      - name: admin
+        user: postgres_admin
       - name: mlflow
         db: mlflow_db
         user: mlflow
@@ -23,6 +27,9 @@
       - name: jenkins
         db: jenkins_db
         user: jenkins
+      - name: infisical
+        db: infisical_db
+        user: infisical
 
     services:
       - name: minio
@@ -65,6 +72,16 @@
       private: true
       default: ""
 
+    - name: vault_docker_hub_username
+      prompt: "Docker Hub username (laisser vide si non configuré)"
+      private: false
+      default: ""
+
+    - name: vault_docker_hub_password
+      prompt: "Docker Hub password/token (laisser vide si non configuré)"
+      private: true
+      default: ""
+
   tasks:
     - name: Create vault directories
       ansible.builtin.file:
@@ -72,8 +89,8 @@
         state: directory
         mode: "0700"
       loop:
-        - "{{ ansible_vault_dir }}"
-        - "{{ ansible_vault_password_path }}"
+        - "{{ ansible_vault_file | dirname }}"
+        - "{{ ansible_vault_password_file | dirname }}"
 
     - name: Check vault password file
       ansible.builtin.stat:
@@ -110,16 +127,20 @@
         path: "{{ ansible_vault_file }}"
       register: vault_file_info
 
-    - name: Stop if vault already exists
-      ansible.builtin.fail:
-        msg: >-
-          Le vault existe déjà : {{ ansible_vault_file }}.
-          Par sécurité, ce playbook refuse de l'écraser.
-          Relance avec -e vault_force_recreate=true si tu veux vraiment le régénérer.
+    # On charge le fichier existant dans un dictionnaire dédié pour préserver
+    # aussi les clés que ce playbook ne sait pas générer explicitement.
+    - name: Load existing vault content
+      ansible.builtin.include_vars:
+        file: "{{ ansible_vault_file }}"
+        name: existing_vault_content
       when:
         - vault_file_info.stat.exists
         - not (vault_force_recreate | bool)
+      no_log: true
 
+    # Si le vault existe, Ansible l'a déjà chargé via group_vars/all.
+    # Les tâches incluses ci-dessous lisent donc les variables actuelles
+    # et ne génèrent que ce qui manque, sauf en mode force.
     - name: Build services secrets
       ansible.builtin.include_tasks: tasks/ansible_vault/create_service_secrets.yaml
       loop: "{{ services }}"
@@ -138,22 +159,34 @@
     - name: Build dagshub secrets
       ansible.builtin.include_tasks: tasks/ansible_vault/create_dagshub_secrets.yaml
 
+    - name: Build Docker Hub secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_docker_hub_secrets.yaml
+
+    - name: Build Infisical secrets
+      ansible.builtin.include_tasks: tasks/ansible_vault/create_infisical_secrets.yaml
+
     - name: Concat secrets
       ansible.builtin.set_fact:
         vault_content: >-
           {{
-            {}
-            combine(github_secret, recursive=True)
-            | combine(dagshub_secret, recursive=True):
+            existing_vault_content | default({})
+            | combine(github_secret, recursive=True)
+            | combine(dagshub_secret, recursive=True)
+            | combine(docker_hub_secret, recursive=True)
             | combine(services_secrets, recursive=True)
-            | combine(postgres_secret, recursive=True)
+            | combine(postgres_secrets, recursive=True)
+            | combine(infisical_secret, recursive=True)
           }}
       no_log: true
 
+    # Le fichier peut être déjà chiffré. On le remplace d'abord par le YAML
+    # fusionné en clair, puis on chiffre immédiatement ce nouveau contenu.
+    # Le template force github_app.private_key en bloc literal YAML pour
+    # éviter que PyYAML ne réécrive le PEM en chaîne multilignes quotée.
     - name: Write plaintext vault YAML before encryption
-      ansible.builtin.copy:
+      ansible.builtin.template:
+        src: secrets.vault.yaml.j2
         dest: "{{ ansible_vault_file }}"
-        content: "{{ vault_content | to_nice_yaml(indent=2, sort_keys=false) }}"
         mode: "0600"
       no_log: true
 

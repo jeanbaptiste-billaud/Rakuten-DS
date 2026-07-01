@@ -1,0 +1,150 @@
+---
+- name: Ensure Podman network exists
+  containers.podman.podman_network:
+    name: "{{ docker_network }}"
+    state: present
+    disable_dns: false
+
+- name: Ensure postgres container is started
+  containers.podman.podman_container:
+    image: "{{ docker_images.postgres.image }}"
+    name: postgres
+    state: started
+    recreate: true
+    volumes:
+      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
+    env:
+      POSTGRES_USER: "{{ postgres.root.user }}"
+      POSTGRES_PASSWORD: "{{ postgres.root.password }}"
+      POSTGRES_DB: postgres
+    network: "{{ docker_network }}"
+    network_aliases:
+      - postgres
+  no_log: true
+
+- name: Wait for postgres to accept connections
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - pg_isready
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+  register: infisical_postgres_ready
+  retries: 30
+  delay: 2
+  until: infisical_postgres_ready.rc == 0
+  changed_when: false
+  no_log: true
+
+- name: Create Infisical postgres role
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -v
+      - "ON_ERROR_STOP=1"
+      - -c
+      - >-
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ postgres.infisical.user }}') THEN
+            CREATE ROLE "{{ postgres.infisical.user }}" LOGIN PASSWORD '{{ postgres.infisical.password }}';
+          ELSE
+            ALTER ROLE "{{ postgres.infisical.user }}" WITH LOGIN PASSWORD '{{ postgres.infisical.password }}';
+          END IF;
+        END
+        $$;
+  changed_when: false
+  no_log: true
+
+- name: Check Infisical postgres database
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_database WHERE datname='{{ postgres.infisical.db }}'"
+  register: infisical_database_exists
+  changed_when: false
+  no_log: true
+
+- name: Create Infisical postgres database
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - createdb
+      - -U
+      - "{{ postgres.root.user }}"
+      - -O
+      - "{{ postgres.infisical.user }}"
+      - "{{ postgres.infisical.db }}"
+  when: infisical_database_exists.stdout | trim != "1"
+  no_log: true
+
+- name: Ensure Infisical redis container is started
+  containers.podman.podman_container:
+    image: "{{ docker_images.redis.image }}"
+    name: redis
+    state: started
+    recreate: true
+    volumes:
+      - "{{ docker_volumes.redis }}:/data"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    network: "{{ docker_network }}"
+    network_aliases:
+      - redis
+
+- name: Ensure Infisical container is started
+  containers.podman.podman_container:
+    image: "{{ docker_images.infisical.image }}"
+    name: infisical
+    state: started
+    recreate: true
+    ports:
+      - "8080:8080"
+    env:
+      ENCRYPTION_KEY: "{{ infisical.encryption_key }}"
+      AUTH_SECRET: "{{ infisical.auth_secret }}"
+      SITE_URL: "{{ infisical.site_url }}"
+      DB_CONNECTION_URI: "postgresql://{{ postgres.infisical.user }}:{{ postgres.infisical.password }}@postgres:5432/{{ postgres.infisical.db }}"
+      REDIS_URL: "{{ infisical.redis_url }}"
+      NODE_ENV: production
+    network: "{{ docker_network }}"
+    network_aliases:
+      - infisical
+  no_log: true
+
+- name: Wait for Infisical HTTP endpoint
+  ansible.builtin.uri:
+    url: "{{ infisical.site_url }}"
+    method: GET
+    status_code:
+      - 200
+      - 302
+      - 404
+  register: infisical_http_check
+  retries: 60
+  delay: 2
+  until: infisical_http_check.status in [200, 302, 404]
+  changed_when: false
