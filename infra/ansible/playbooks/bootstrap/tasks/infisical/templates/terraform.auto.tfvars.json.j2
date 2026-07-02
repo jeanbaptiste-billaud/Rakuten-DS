@@ -1,0 +1,47 @@
+{
+  "infisical_host": {{ infisical.site_url | to_json }},
+  "bootstrap_token": {{ infisical_bootstrap_token | to_json }},
+  "organization_id": {{ infisical_organization_id | to_json }},
+  "project_name": {{ infisical.bootstrap.project_name | to_json }},
+  "project_slug": {{ (infisical.bootstrap.project_slug | default(infisical.bootstrap.project_name | lower | regex_replace('[^a-z0-9]+', '-') | regex_replace('(^-|-$)', ''))) | to_json }},
+  "environment_slug": {{ infisical.bootstrap.environment_slug | to_json }},
+  "identities": {
+    "airflow-id": {
+      "path": "/services/airflow"
+    },
+    "api-gateway-id": {
+      "path": "/services/api-gateway"
+    },
+    "mlflow-server-id": {
+      "path": "/services/mlflow"
+    },
+    "data-ingestion-id": {
+      "path": "/workloads/data-ingestion"
+    },
+    "data-enrichment-id": {
+      "path": "/workloads/data-enrichment"
+    },
+    "data-preprocessing-id": {
+      "path": "/workloads/data-preprocessing"
+    },
+    "training-id": {
+      "path": "/workloads/training"
+    },
+    "model-evaluation-id": {
+      "path": "/workloads/model-evaluation"
+    },
+    "model-build-id": {
+      "path": "/workloads/model-build"
+    },
+    "backup-id": {
+      "path": "/workloads/backup"
+    },
+    "postgres-backup-id": {
+      "path": "/workloads/postgres-backup"
+    },
+    "dvc-publisher-id": {
+      "path": "/workloads/dvc-publisher"
+    }
+  }
+}
+

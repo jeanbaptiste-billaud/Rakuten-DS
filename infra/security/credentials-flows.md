@@ -17,7 +17,8 @@ La V2 est le chantier de durcissement de l'infrastructure. L'objectif est de
 passer d'une stack demonstrative et partiellement manuelle a une infrastructure
 securisee, reproductible et gouvernee par l'IaC:
 
-- Ansible pour le bootstrap local et l'initialisation des briques de confiance;
+- Ansible pour le bootstrap local et l'orchestration des briques de confiance;
+- Terraform pour configurer Infisical une fois l'API REST joignable;
 - Infisical pour la distribution runtime des secrets;
 - des identities separees par perimetre de droits;
 - des comptes MinIO non-root par usage;
@@ -48,6 +49,7 @@ Les changements en cours constituent les premieres briques de la V2.
 | --- | --- | --- |
 | Ansible Vault | `infra/ansible/inventory/group_vars/all/secrets.vault.yaml` | Source seed chiffree des secrets V2 |
 | Seed Infisical | `infra/ansible/playbooks/bootstrap/tasks/infisical/bootstrap_infisical.yaml` | Charge les secrets du vault dans Infisical |
+| Terraform Infisical | `infra/terraform/infisical` | Configure projet, folders, identities, Universal Auth et privileges |
 | Template seed | `infra/ansible/playbooks/bootstrap/tasks/infisical/templates/seed_secrets.yaml.j2` | Normalise les noms de secrets |
 | Runtime seed | `infra/ansible/playbooks/bootstrap/tasks/infisical/templates/runtime_secrets.yaml.j2` | Prepare les chemins `/workloads/*` consommes par les jobs V2 |
 | Compose runtime | `deploy_branch/deploy/compose/docker-compose.yml` | V1: injecte encore des variables secretes via `.env` |
@@ -224,13 +226,16 @@ Les services lances par Compose/Terraform ont deux categories de secrets:
 
 Le pattern cible est:
 
-1. Ansible demarre Infisical et seed les secrets depuis le vault.
-2. Ansible execute les taches de bootstrap des services avec les secrets lus
+1. Ansible demarre Infisical et attend que l'API REST soit joignable.
+2. Ansible lance Terraform pour configurer le projet, les folders, les
+   identities, Universal Auth et les privileges.
+3. Ansible seed ensuite les valeurs secretes depuis le vault.
+4. Ansible execute les taches de bootstrap des services avec les secrets lus
    depuis Infisical ou encore depuis le vault si Infisical n'est pas disponible.
-3. Les services long-lived ne recoivent plus les secrets root/admin.
-4. Quand le service supporte les secrets par fichier (`*_FILE`), le secret est
+5. Les services long-lived ne recoivent plus les secrets root/admin.
+6. Quand le service supporte les secrets par fichier (`*_FILE`), le secret est
    monte en fichier temporaire plutot qu'en variable d'environnement.
-5. Quand le service exige des variables d'environnement, le conteneur est lance
+7. Quand le service exige des variables d'environnement, le conteneur est lance
    via un wrapper `infisical run -- <commande>` ou via l'agent Infisical, avec
    une identity dediee au service.
 
@@ -262,11 +267,13 @@ minimaux.
 - Definir les comptes MinIO non-root par usage.
 - Definir le mecanisme de protection MLflow.
 - Definir le mode exact d'utilisation de l'agent Infisical dans les taches
-  `DockerOperator`.
+  `DockerOperator`. La premiere implementation V2 utilise Universal Auth puis
+  `infisical run`.
 - Sortir `auth-service` du plan cible V2, puisqu'il sera remplace par Traefik.
-- Garder la creation initiale des identities Infisical dans le bootstrap
-  Ansible. Terraform pourra consommer Infisical ensuite, mais ne doit pas etre
-  necessaire pour creer les identities de bootstrap.
+- Garder Ansible comme orchestrateur du bootstrap Infisical, mais deleguer la
+  configuration Infisical durable a Terraform.
+- Ne pas gerer les valeurs secretes applicatives dans Terraform: elles restent
+  dans Ansible Vault puis sont seed dans Infisical par Ansible.
 
 ## Migration Cible
 
@@ -278,7 +285,7 @@ minimaux.
 4. Creer des credentials MinIO separes par usage. Generation vault ajoutee en
    V2; creation effective des users MinIO a brancher au bootstrap MinIO.
 5. Creer les machine identities Infisical et leurs droits projet/env/path via
-   Ansible bootstrap.
+   Terraform lance par Ansible.
 6. Injecter les secrets via Infisical CLI/agent en dev. Premiere integration
    `infisical run` ajoutee dans les `DockerOperator`.
 7. Remplacer l'injection Docker Compose par Terraform puis Kubernetes auth.

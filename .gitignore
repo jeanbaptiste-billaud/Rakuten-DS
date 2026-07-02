@@ -5,3 +5,15 @@ data/images/**
 *.npz
 logs/
 *.log
+
+# Terraform local state and generated secret inputs/outputs
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+infra/terraform/infisical/terraform.auto.tfvars.json
+terraform-output.json
+infisical-bootstrap.json
+runtime.env

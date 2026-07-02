@@ -31,15 +31,24 @@ def _identity_token_env(identity: str) -> str:
     return f"INFISICAL_{identity.upper().replace('-', '_')}_TOKEN"
 
 
+def _identity_client_id_env(identity: str) -> str:
+    return f"INFISICAL_{identity.upper().replace('-', '_')}_CLIENT_ID"
+
+
+def _identity_client_secret_env(identity: str) -> str:
+    return f"INFISICAL_{identity.upper().replace('-', '_')}_CLIENT_SECRET"
+
+
 def infisical_runtime_env(identity: str) -> dict[str, str]:
-    token_env = _identity_token_env(identity)
     return {
         "INFISICAL_DOMAIN": INFISICAL_DOMAIN,
         "INFISICAL_ENV": INFISICAL_ENV,
         "INFISICAL_PROJECT_ID": INFISICAL_PROJECT_ID,
         "INFISICAL_IDENTITY": identity,
         "INFISICAL_SECRET_PATH": INFISICAL_SECRET_PATHS[identity],
-        "INFISICAL_TOKEN": os.getenv(token_env, ""),
+        "INFISICAL_CLIENT_ID": os.getenv(_identity_client_id_env(identity), ""),
+        "INFISICAL_CLIENT_SECRET": os.getenv(_identity_client_secret_env(identity), ""),
+        "INFISICAL_TOKEN": os.getenv(_identity_token_env(identity), ""),
     }
 
 
@@ -50,8 +59,19 @@ def infisical_run_command(script: str, identity: str):
         "-lc",
         f"""
         set -e
-        : "${{INFISICAL_TOKEN:?missing Infisical token for {identity}}}"
         : "${{INFISICAL_PROJECT_ID:?missing Infisical project id}}"
+        if [ -z "${{INFISICAL_TOKEN:-}}" ]; then
+          : "${{INFISICAL_CLIENT_ID:?missing Infisical client id for {identity}}}"
+          : "${{INFISICAL_CLIENT_SECRET:?missing Infisical client secret for {identity}}}"
+          INFISICAL_TOKEN="$(infisical login \
+            --method universal-auth \
+            --client-id "$INFISICAL_CLIENT_ID" \
+            --client-secret "$INFISICAL_CLIENT_SECRET" \
+            --domain "$INFISICAL_DOMAIN" \
+            --plain \
+            --silent)"
+          export INFISICAL_TOKEN
+        fi
         exec infisical run \
           --silent \
           --domain "$INFISICAL_DOMAIN" \

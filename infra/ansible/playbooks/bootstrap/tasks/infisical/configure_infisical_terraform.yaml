@@ -1,0 +1,65 @@
+---
+- name: Define Infisical Terraform paths
+  ansible.builtin.set_fact:
+    infisical_terraform_dir: "{{ infisical_terraform_dir | default(project_root | default(playbook_dir ~ '/../../../..') ~ '/infra/terraform/infisical') }}"
+    infisical_terraform_state_file: "{{ infisical_terraform_state_file | default((infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json')) | dirname ~ '/terraform.tfstate') }}"
+    infisical_terraform_outputs_file: "{{ infisical_terraform_outputs_file | default((infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json')) | dirname ~ '/terraform-output.json') }}"
+    infisical_runtime_env_file: "{{ infisical_runtime_env_file | default((infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json')) | dirname ~ '/runtime.env') }}"
+
+- name: Check Terraform CLI availability
+  ansible.builtin.command:
+    argv:
+      - terraform
+      - version
+  register: infisical_terraform_version
+  changed_when: false
+
+- name: Write Infisical Terraform variables
+  ansible.builtin.template:
+    src: terraform.auto.tfvars.json.j2
+    dest: "{{ infisical_terraform_dir }}/terraform.auto.tfvars.json"
+    mode: "0600"
+  no_log: true
+
+- name: Apply Infisical Terraform configuration
+  community.general.terraform:
+    project_path: "{{ infisical_terraform_dir }}"
+    state: present
+    force_init: true
+    state_file: "{{ infisical_terraform_state_file }}"
+    variables_files:
+      - "{{ infisical_terraform_dir }}/terraform.auto.tfvars.json"
+  register: infisical_terraform_apply
+  no_log: true
+
+- name: Read Infisical Terraform outputs
+  ansible.builtin.command:
+    argv:
+      - terraform
+      - -chdir={{ infisical_terraform_dir }}
+      - output
+      - -json
+      - -state={{ infisical_terraform_state_file }}
+  register: infisical_terraform_outputs
+  changed_when: false
+  no_log: true
+
+- name: Persist Infisical Terraform outputs
+  ansible.builtin.copy:
+    dest: "{{ infisical_terraform_outputs_file }}"
+    content: "{{ infisical_terraform_outputs.stdout }}\n"
+    mode: "0600"
+  no_log: true
+
+- name: Select Infisical Terraform project id
+  ansible.builtin.set_fact:
+    infisical_terraform_output_data: "{{ infisical_terraform_outputs.stdout | from_json }}"
+    infisical_project_id: "{{ (infisical_terraform_outputs.stdout | from_json).project_id.value }}"
+  no_log: true
+
+- name: Write Infisical runtime environment file
+  ansible.builtin.template:
+    src: runtime_env.j2
+    dest: "{{ infisical_runtime_env_file }}"
+    mode: "0600"
+  no_log: true

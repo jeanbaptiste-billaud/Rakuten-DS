@@ -160,13 +160,24 @@
   when:
     - infisical_bootstrap_state.stat.exists
     - infisical_bootstrap_state_data.project_id is defined
+    - not (infisical_configure_with_terraform | default(true) | bool)
   no_log: true
 
 - name: Select Infisical organization id
   ansible.builtin.set_fact:
-    infisical_organization_id: "{{ infisical_bootstrap_output.organization.id | default(infisical_bootstrap_state_data.bootstrap.organization.id) }}"
-  when: infisical_project_id is not defined
+    infisical_organization_id: >-
+      {{
+        infisical_bootstrap_state_data.organization_id
+        | default(infisical_bootstrap_output.organization.id)
+        | default(infisical_bootstrap_state_data.bootstrap.organization.id)
+      }}
+  when:
+    - infisical_project_id is not defined or (infisical_configure_with_terraform | default(true) | bool)
   no_log: true
+
+- name: Configure Infisical project and identities with Terraform
+  ansible.builtin.include_tasks: configure_infisical_terraform.yaml
+  when: infisical_configure_with_terraform | default(true) | bool
 
 - name: Create Infisical project
   ansible.builtin.uri:
@@ -184,13 +195,17 @@
       - 200
       - 201
   register: infisical_project_response
-  when: infisical_project_id is not defined
+  when:
+    - infisical_project_id is not defined
+    - not (infisical_configure_with_terraform | default(true) | bool)
   no_log: true
 
 - name: Select Infisical project id
   ansible.builtin.set_fact:
     infisical_project_id: "{{ infisical_project_response.json.project.id }}"
-  when: infisical_project_id is not defined
+  when:
+    - infisical_project_id is not defined
+    - not (infisical_configure_with_terraform | default(true) | bool)
   no_log: true
 
 - name: Persist Infisical project state
