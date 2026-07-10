@@ -16,4 +16,5 @@ logs/
 infra/terraform/infisical/terraform.auto.tfvars.json
 terraform-output.json
 infisical-bootstrap.json
+infisical-bootstrap.log
 runtime.env

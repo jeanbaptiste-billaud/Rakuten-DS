@@ -13,9 +13,12 @@ resource "infisical_project" "rakuten" {
 }
 
 locals {
-  folder_paths = toset(distinct([
-    for identity in var.identities : identity.path
-  ]))
+  folder_paths = toset(distinct(flatten([
+    for identity_name, identity in var.identities : concat(
+      identity.path != null && identity.path != "" ? [identity.path] : [],
+      identity.paths
+    )
+  ])))
 
   folder_parts = {
     for path in local.folder_paths : path => compact(split("/", trim(path, "/")))
@@ -131,11 +134,27 @@ resource "infisical_project_identity" "project_identities" {
 }
 
 resource "infisical_project_identity_specific_privilege" "identity_privileges" {
-  for_each = var.identities
+  for_each = {
+    for item in flatten([
+      for identity_name, identity in var.identities : [
+        for path in concat(
+          identity.path != null && identity.path != "" ? [identity.path] : [],
+          identity.paths
+        ) : {
+          key         = "${identity_name}:${path}"
+          identity_id  = infisical_project_identity.project_identities[identity_name].identity_id
+          project_slug = infisical_project.rakuten.slug
+          slug         = identity_name
+          path         = path
+          actions      = identity.actions
+        }
+      ]
+    ]) : item.key => item
+  }
 
-  project_slug = infisical_project.rakuten.slug
-  identity_id  = infisical_project_identity.project_identities[each.key].identity_id
-  slug         = each.key
+  project_slug = each.value.project_slug
+  identity_id  = each.value.identity_id
+  slug         = each.value.slug
 
   permissions_v2 = [
     {

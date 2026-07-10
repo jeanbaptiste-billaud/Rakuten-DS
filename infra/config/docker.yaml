@@ -1,0 +1,10 @@
+network:
+  name: rakuten_network
+
+volumes:
+  dvc: dvc_data
+  postgres: pgdata
+  logs: logs_and_reports
+  redis: redis_data
+  minio: minio_data
+  airflow: airflow_vol

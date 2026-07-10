@@ -1,0 +1,59 @@
+---
+- name: Start MinIO container
+  containers.podman.podman_container:
+    image: "{{ bootstrap_minio_image }}"
+    name: minio
+    state: started
+    recreate: true
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "{{ docker_volumes.minio }}:/data"
+    env:
+      MINIO_ROOT_USER: "{{ minio.MINIO_ROOT_USER }}"
+      MINIO_ROOT_PASSWORD: "{{ minio.MINIO_ROOT_PASSWORD }}"
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    network: "{{ docker_network }}"
+    network_aliases:
+      - minio
+  no_log: true
+
+- name: Wait for MinIO HTTP endpoint
+  ansible.builtin.uri:
+    url: "{{ bootstrap_minio_health_url }}"
+    method: GET
+    status_code:
+      - 200
+  register: bootstrap_minio_health
+  retries: 60
+  delay: 2
+  until: bootstrap_minio_health.status == 200
+  changed_when: false
+
+- name: Populate MinIO buckets and copy initial data
+  containers.podman.podman_container:
+    name: minio-client
+    image: "{{ docker_images['minio-client'].image }}"
+    rm: true
+    recreate: true
+    detach: false
+    network: "{{ docker_network }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    entrypoint:
+      - /bin/sh
+      - -lc
+    env:
+      MINIO_MLFLOW_BUCKET: "{{ minio.MINIO_MLFLOW_BUCKET | default('mlflow-artifacts') }}"
+      MINIO_ROOT_USER: "{{ minio.MINIO_ROOT_USER }}"
+      MINIO_ROOT_PASSWORD: "{{ minio.MINIO_ROOT_PASSWORD }}"
+      MINIO_HOST: "{{ minio.MINIO_HOST | default('minio') }}"
+      MINIO_PORT: "{{ minio.MINIO_PORT | default('9000') }}"
+    command: |
+      /src/minio_init.sh > /proc/1/fd/1 2>&1
+  no_log: true

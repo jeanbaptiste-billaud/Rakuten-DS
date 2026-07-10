@@ -23,7 +23,7 @@ docker_images:
   airflow:
     image: "{{ docker_repository }}:airflow-latest"
   postgres:
-    image: dhi.io/postgres:18
+    image: docker.io/library/postgres:17
   redis:
     image: docker.io/library/redis:7-alpine
   infisical:

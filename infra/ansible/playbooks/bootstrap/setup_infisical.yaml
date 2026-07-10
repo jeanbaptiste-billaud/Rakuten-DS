@@ -5,18 +5,42 @@
   gather_facts: true
 
   vars:
+    project_root: >-
+      {{
+        lookup(
+          'ansible.builtin.pipe',
+          'git rev-parse --show-toplevel'
+        )
+      }}
     infisical_install_host_cli: true
     infisical_configure_with_terraform: true
     infisical_cli_command:
       - infisical
 
   tasks:
+    - name: Check project root
+      ansible.builtin.stat:
+        path: "{{ project_root }}"
+      register: project_root_stat
+
+    - name: Validate project root
+      ansible.builtin.assert:
+        that:
+          - project_root_stat.stat.exists
+          - project_root_stat.stat.isdir
+        fail_msg: "Invalid project_root: {{ project_root }}"
+
+#    - name: Install Terraform CLI
+#      ansible.builtin.include_tasks:
+#        file: "{{ playbook_dir }}/../common/tasks/terraform/install_terraform.yaml"
+#      when: infisical_configure_with_terraform | default(true) | bool
+#
     - name: Setup Infisical service
       ansible.builtin.include_tasks: tasks/infisical/setup_infisical.yaml
-
-    - name: Install Infisical CLI
-      ansible.builtin.include_tasks: tasks/infisical/install_infisical_cli.yaml
-      when: infisical_install_host_cli | bool
+#
+#    - name: Install Infisical CLI
+#      ansible.builtin.include_tasks: tasks/infisical/install_infisical_cli.yaml
+#      when: infisical_install_host_cli | bool
 
     - name: Bootstrap and seed Infisical
       ansible.builtin.include_tasks: tasks/infisical/bootstrap_infisical.yaml

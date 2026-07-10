@@ -1,128 +1,67 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# -----------------------------
-# Config
-# -----------------------------
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
+source "$(git rev-parse --show-toplevel)/scripts/lib/project_paths.sh"
 
-REPO_OWNER="jeanbaptiste-billaud"
-REPO_NAME="Rakuten-DS"
-BRANCH_NAME="dvc"
-REPO_HTTPS="github.com/${REPO_OWNER}/${REPO_NAME}.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+ANSIBLE_CONFIG_FILE="${PROJECT_ROOT}/ansible.cfg"
 
-SCRIPT_DIR="$(pwd -P)"
-set -a
-source "$SCRIPT_DIR/.env"
-set +a
+export PROJECT_ROOT
+export ANSIBLE_CONFIG="${ANSIBLE_CONFIG_FILE}"
+export ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}"
+export ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}"
 
-# -----------------------------
-# Helpers
-# -----------------------------
-prompt_secret() {
-  local __var_name="$1"
-  local __prompt="$2"
-  local __val
-  read -r -s -p "$__prompt" __val
-  echo
-  printf -v "$__var_name" '%s' "$__val"
-}
+mkdir -p "${ANSIBLE_LOCAL_TEMP}" "${ANSIBLE_REMOTE_TEMP}"
 
-prompt() {
-  local __var_name="$1"
-  local __prompt="$2"
-  local __default="${3:-}"
-  local __val
-  if [[ -n "$__default" ]]; then
-    read -r -p "$__prompt [$__default]: " __val
-    __val="${__val:-$__default}"
-  else
-    read -r -p "$__prompt: " __val
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+  set -a
+  source "${SCRIPT_DIR}/.env"
+  set +a
+fi
+
+ensure_ansible() {
+  if command -v ansible-playbook >/dev/null 2>&1 && command -v ansible-galaxy >/dev/null 2>&1; then
+    return
   fi
-  printf -v "$__var_name" '%s' "$__val"
+
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "sudo is required to install ansible-core." >&2
+    exit 1
+  fi
+
+  sudo apt-get update
+  sudo apt-get install -y ansible-core
 }
 
-# -----------------------------
-# 0) Inputs (host side)
-# -----------------------------
-echo "=== Bootstrap init ==="
+install_collections() {
+  ansible-galaxy collection install -r "${PROJECT_ROOT}/infra/ansible/requirements.yaml"
+}
 
-prompt_secret GITHUB_TOKEN "GitHub token (fine-grained PAT) pour cloner le repo privé: "
-prompt DAGSHUB_USER "DagsHub user"
-prompt_secret DAGSHUB_PASSWORD "DagsHub token/password (DVC auth basic): "
+run_playbook() {
+  local playbook="$1"
+  shift
+  ansible-playbook "$playbook" "$@"
+}
 
-echo
-echo "=== Phase 0: Initialisation des volumes docker ==="
-docker compose run --rm --user 0:0 dvc sh -lc "chown -R ${HOST_UID}:${HOST_GID} ${WORKDIR}"
+ensure_ansible
 
-echo
-echo "=== Phase 1: DVC (clone + config remote + dvc pull) ==="
+cd "${PROJECT_ROOT}"
 
-docker compose -f "${COMPOSE_FILE}" run --rm \
-  -e GITHUB_TOKEN="${GITHUB_TOKEN}" \
-  -e DAGSHUB_USER="${DAGSHUB_USER}" \
-  -e DAGSHUB_PASSWORD="${DAGSHUB_PASSWORD}" \
-  dvc bash -lc '
-    set -euo pipefail
-    cd "'${WORKDIR}'/dvc_data"
+install_collections
 
-    if [[ ! -d "'"${REPO_NAME}"'" ]]; then
-      echo "[DVC] Cloning repo (private) ..."
-      # Clone avec token via HTTPS
-      git clone --branch '"${BRANCH_NAME}"' --single-branch \           
-        "https://"'${GITHUB_TOKEN}'"@'"${REPO_HTTPS}"'"
-    else
-      echo "[DVC] Repo already present, skipping clone."
-    fi
+run_playbook \
+  infra/ansible/playbooks/common/install_local_softwares.yaml \
+  --limit deploy
 
-    cd "'"${REPO_NAME}"'"
+run_playbook \
+  infra/ansible/playbooks/bootstrap/boostrap_pre_vault.yaml \
+  --limit deploy
 
-    echo "[DVC] Configuring DVC remote origin (local auth)..."
-    dvc remote modify origin --local auth basic
-    dvc remote modify origin --local user '"${DAGSHUB_USER}"'
-    dvc remote modify origin --local password '"${DAGSHUB_PASSWORD}"'
+run_playbook \
+  infra/ansible/playbooks/bootstrap/bootstrap.yaml \
+  --limit deploy
 
-    echo "[DVC] Pulling DVC tracked data..."
-    sed -i "s/\r$//" .dvc/dvc_tracking_list.txt
-    grep -vE "^\s*($|#)" .dvc/dvc_tracking_list.txt | xargs -d "\n" dvc pull
-
-    echo "[DVC] Done."
-
-    echo "logs and reports restoration"
-    tar -xzf data/logs_and_reports.tar.gz -C '${WORKDIR}'
-  '
-echo
-echo "=== Phase 2: Restauration des bases de données de mlflow et airflow"
-docker compose -f "${COMPOSE_FILE}" up -d postgres
-# Transformer la liste en array
-IFS=',' read -r -a DB_LIST_ARRAY <<< "${DB_LIST}"
-
-for DB in "${DB_LIST_ARRAY[@]}"; do
-  DB="$(echo "$DB" | xargs)"   # trim espaces
-  DUMP_PATH="${DB_BACKUP_DIR}/${DB}.dump"
-
-  echo "🔄 Restauration ${DB}"
-
-  docker compose exec -T \
-    -e PGPASSWORD="${POSTGRES_PASSWORD}" \
-    postgres \
-    pg_restore -U "${POSTGRES_USER}" -d postgres \
-      --create --clean --if-exists \
-      --no-owner --no-privileges \
-      "${DUMP_PATH}"
-
-  docker compose exec -T postgres bash -lc \
-    "psql -U \"${POSTGRES_USER}\" -d postgres -tAc \"SELECT 1 FROM pg_database WHERE datname = '${DB}';\" | grep -q '^1$'"
-
-  echo "✅ ${DB} OK"
-done
-docker compose -f "${COMPOSE_FILE}" down
-
-echo
-echo "=== Phase 3: MinIO (start + bucket population via /src/minio_init.sh) ==="
-docker compose -f "${COMPOSE_FILE}" run --rm minio-client
-
-docker compose -f "${COMPOSE_FILE}" down
-
-echo
-echo "=== Bootstrap terminé ==="
+run_playbook \
+  infra/ansible/playbooks/bootstrap/setup_infisical.yaml \
+  --limit deploy

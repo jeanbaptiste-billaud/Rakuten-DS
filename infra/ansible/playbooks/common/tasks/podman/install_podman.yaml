@@ -1,4 +1,13 @@
 ---
+- name: Check Podman CLI
+  ansible.builtin.command:
+    argv:
+      - podman
+      - --version
+  register: podman_cli_version
+  changed_when: false
+  failed_when: false
+
 - name: Install Podman
   ansible.builtin.apt:
     name:
@@ -11,6 +20,10 @@
     state: present
     update_cache: true
     install_recommends: false
+  become: true
+  when:
+    - podman_cli_version.rc != 0
+    - ansible_facts.os_family | default('Debian') == "Debian"
 
 - name: Create containers registries config directory
   ansible.builtin.file:
@@ -29,23 +42,18 @@
     content: |
       unqualified-search-registries = ["{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"]
 
-- name: Check Docker Hub credentials are defined
-  ansible.builtin.assert:
-    that:
-      - docker_hub is defined
-      - docker_hub.username is defined
-      - docker_hub.username | length > 0
-      - docker_hub.password is defined
-      - docker_hub.password | length > 0
-    fail_msg: "Docker Hub credentials must be defined as docker_hub.username and docker_hub.password."
-  no_log: true
-
 - name: Create containers config directory for Ansible user
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/.config/containers"
     state: directory
     mode: "0700"
   become: false
+  when:
+    - docker_hub is defined
+    - docker_hub.username is defined
+    - docker_hub.username | length > 0
+    - docker_hub.password is defined
+    - docker_hub.password | length > 0
 
 - name: Login to Docker Hub with Podman
   containers.podman.podman_login:
@@ -55,9 +63,21 @@
     authfile: "{{ ansible_user_dir }}/.config/containers/auth.json"
   become: false
   no_log: true
+  when:
+    - docker_hub is defined
+    - docker_hub.username is defined
+    - docker_hub.username | length > 0
+    - docker_hub.password is defined
+    - docker_hub.password | length > 0
 
 - name: Secure Podman registry auth file
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/.config/containers/auth.json"
     mode: "0600"
   become: false
+  when:
+    - docker_hub is defined
+    - docker_hub.username is defined
+    - docker_hub.username | length > 0
+    - docker_hub.password is defined
+    - docker_hub.password | length > 0

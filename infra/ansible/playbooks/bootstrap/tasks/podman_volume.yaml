@@ -2,7 +2,7 @@
   containers.podman.podman_volume:
     name: "{{ item.value }}"
     recreate: false
-  loop: "{{ docker_volumes | dict2items }}"
+  loop: "{{ docker_volume_items }}"
   register: podman_volumes
 
 - name: Build volume mountpoints dict
@@ -13,4 +13,4 @@
         combine({ item.item.key: item.volume.Mountpoint })
       }}
   loop: "{{ podman_volumes.results }}"
-  no_log: true
+#  no_log: true

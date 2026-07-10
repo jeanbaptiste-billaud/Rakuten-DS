@@ -1,0 +1,59 @@
+---
+- name: Start postgres container
+  containers.podman.podman_container:
+    image: "{{ docker_images.postgres.image }}"
+    name: postgres
+    state: started
+    recreate: true
+    volumes:
+      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}:ro"
+    env:
+      POSTGRES_USER: "{{ postgres.root.user }}"
+      POSTGRES_PASSWORD: "{{ postgres.root.password }}"
+      POSTGRES_DB: postgres
+    network: "{{ docker_network }}"
+    network_aliases:
+      - postgres
+  no_log: true
+
+- name: Wait for postgres to accept connections
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - pg_isready
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+  register: bootstrap_postgres_ready
+  retries: 30
+  delay: 2
+  until: bootstrap_postgres_ready.rc == 0
+  changed_when: false
+  no_log: true
+
+- name: Restore postgres dumps
+  containers.podman.podman_container:
+    image: "{{ docker_images.postgres.image }}"
+    name: "postgres-restore-{{ item.name }}"
+    rm: true
+    recreate: true
+    detach: false
+    network: "{{ docker_network }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}:ro"
+    env:
+      PGPASSWORD: "{{ postgres.root.password }}"
+    entrypoint:
+      - /bin/sh
+      - -lc
+    command: |
+      set -e
+      dump_file="{{ bootstrap_repo_dir }}/data/pg_backups/{{ item.name }}.dump"
+      pg_restore -h postgres -U "{{ postgres.root.user }}" -d postgres --create --clean --if-exists --no-owner --no-privileges "$dump_file"
+      psql -h postgres -U "{{ postgres.root.user }}" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '{{ item.db }}';" | grep -q '^1$'
+  loop: "{{ bootstrap_postgres_dumps }}"
+  no_log: true

@@ -8,22 +8,28 @@
       private: true
 
   vars:
-    bitwarden_email: "billaud.jeanbaptiste@gmail.com"
+    ansible_vault_password_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/rakuten/ansible"
+    ansible_vault_password_file: "{{ ansible_vault_password_dir }}/.vault_pass"
 
   tasks:
-  - name: Unlock Bitwarden vault
-    ansible.builtin.command:
-      cmd: bw unlock --passwordenv BW_PASSWORD --raw
-    environment:
-      BW_PASSWORD: "{{ bitwarden_master_password }}"
-    register: bw_unlock
-    no_log: true
+  - name: Ensure Ansible vault password directory exists
+    ansible.builtin.file:
+      path: "{{ ansible_vault_password_dir }}"
+      state: directory
+      mode: "0700"
 
-  - name: Create temporary vault password file in RAM
+  - name: Write executable Ansible vault password helper
     ansible.builtin.copy:
-      dest: /dev/shm/ansible_vault_pass
-      content: "{{ lookup('ansible.builtin.pipe', 'bw get password ANSIBLE_VAULT_PASSWORD --session ' ~ bw_unlock.stdout) }}"
-      mode: "0600"
+      dest: "{{ ansible_vault_password_file }}"
+      mode: "0700"
+      content: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        : "${BW_PASSWORD:?BW_PASSWORD is required}"
+        session="$(bw unlock --passwordenv BW_PASSWORD --raw)"
+        trap 'bw lock >/dev/null 2>&1 || true' EXIT
+        bw get password ANSIBLE_VAULT_PASSWORD --session "$session"
     no_log: true
 
   - name: Launch restore playbook with Ansible Vault password
@@ -34,14 +40,10 @@
         - infra/ansible/inventory/hosts.ini
         - infra/ansible/playbooks/bootstrap_restore.yaml
         - --vault-password-file
-        - /dev/shm/ansible_vault_pass
+        - "{{ ansible_vault_password_file }}"
+    environment:
+      BW_PASSWORD: "{{ bitwarden_master_password }}"
     no_log: false
-
-  - name: Remove temporary vault password file
-    ansible.builtin.file:
-      path: /dev/shm/ansible_vault_pass
-      state: absent
-    no_log: true
 
   - name: Lock Bitwarden vault
     ansible.builtin.command:

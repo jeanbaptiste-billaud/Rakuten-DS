@@ -46,6 +46,15 @@
 
 ## 🚀 Démarrage rapide
 
+### Déploiement orchestré
+
+Depuis `deploy_branch/deploy`, le script `deploy.sh` récupère Infisical si
+nécessaire puis applique la stack Terraform Docker:
+
+```bash
+./deploy.sh
+```
+
 ### Prérequis
 - Docker et Docker Compose installés
 - Modèle SVM dans `models/SVM/model.pkl`

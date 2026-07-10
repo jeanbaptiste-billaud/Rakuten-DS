@@ -32,9 +32,9 @@ variable "environment_slug" {
 
 variable "identities" {
   type = map(object({
-    path    = string
+    path    = optional(string)
+    paths   = optional(list(string), [])
     actions = optional(list(string), ["describeSecret", "readValue"])
   }))
   description = "Machine identities and their scoped secret path."
 }
-

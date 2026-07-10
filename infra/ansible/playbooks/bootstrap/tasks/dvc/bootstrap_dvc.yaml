@@ -1,0 +1,89 @@
+---
+- name: Check if DVC repo exists
+  ansible.builtin.stat:
+    path: "{{ bootstrap_repo_dir }}/.git"
+  register: dvc_repo
+
+- name: Clone DVC repository
+  containers.podman.podman_container:
+    name: dvc
+    image: "{{ docker_images.dvc.image }}"
+    rm: true
+    recreate: true
+    detach: false
+    workdir: "{{ bootstrap_repo_dir }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    command: "git clone --branch {{ repo_branch }} --single-branch {{ repo_url }} ."
+  when: not dvc_repo.stat.exists
+
+- name: Configure Dagshub remote credentials
+  containers.podman.podman_container:
+    image: "{{ docker_images.dvc.image }}"
+    name: dvc
+    rm: true
+    recreate: true
+    detach: false
+    workdir: "{{ bootstrap_repo_dir }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+
+        dvc remote modify origin --local auth basic
+        dvc remote modify origin --local user "{{ dagshub.user }}"
+        dvc remote modify origin --local password "{{ dagshub.password }}"
+  no_log: true
+
+- name: Load DVC tracking list
+  ansible.builtin.include_vars:
+    file: "{{ volume_mountpoints.dvc }}/.dvc/dvc_tracking_list.yaml"
+
+- name: Normalize DVC tracking list
+  containers.podman.podman_container:
+    image: "{{ docker_images.dvc.image }}"
+    name: dvc
+    rm: true
+    recreate: true
+    detach: false
+    workdir: "{{ bootstrap_repo_dir }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    command:
+      - sh
+      - -c
+      - "sed -i 's/\\r$//' .dvc/dvc_tracking_list.yaml"
+
+- name: Pull DVC tracked data
+  containers.podman.podman_container:
+    name: dvc
+    image: "{{ docker_images.dvc.image }}"
+    rm: true
+    recreate: true
+    detach: false
+    workdir: "{{ bootstrap_repo_dir }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    command:
+      - sh
+      - -c
+      - "dvc pull {{ item }}"
+  loop: "{{ dvc_targets }}"
+
+- name: Remove local DVC config file
+  containers.podman.podman_container:
+    image: "{{ docker_images.dvc.image }}"
+    name: dvc
+    rm: true
+    recreate: true
+    detach: false
+    workdir: "{{ bootstrap_repo_dir }}"
+    volumes:
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+    command:
+      - sh
+      - -c
+      - rm -f .dvc/config.local

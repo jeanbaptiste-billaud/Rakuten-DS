@@ -1,25 +1,62 @@
 ---
 - name: Ensure Podman network exists
-  containers.podman.podman_network:
-    name: "{{ docker_network }}"
-    state: present
-    disable_dns: false
+  ansible.builtin.command:
+    argv:
+      - podman
+      - network
+      - ls
+      - --format
+      - "{% raw %}{{.Name}}{% endraw %}"
+  register: infisical_networks
+  changed_when: false
+  failed_when: false
 
-- name: Ensure postgres container is started
-  containers.podman.podman_container:
-    image: "{{ docker_images.postgres.image }}"
-    name: postgres
-    state: started
-    recreate: true
-    volumes:
-      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
-    env:
-      POSTGRES_USER: "{{ postgres.root.user }}"
-      POSTGRES_PASSWORD: "{{ postgres.root.password }}"
-      POSTGRES_DB: postgres
-    network: "{{ docker_network }}"
-    network_aliases:
+- name: Inspect postgres container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - -f
+      - "{% raw %}{{.State.Status}}{% endraw %}"
       - postgres
+  register: infisical_postgres_container
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Start existing postgres container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - start
+      - postgres
+  when:
+    - infisical_postgres_container.rc == 0
+    - infisical_postgres_container.stdout | trim != "running"
+  no_log: true
+
+- name: Run postgres container if missing
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - -d
+      - --name
+      - postgres
+      - --network
+      - "{{ docker_network }}"
+      - --network-alias
+      - postgres
+      - -v
+      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
+      - -e
+      - POSTGRES_USER={{ postgres.root.user }}
+      - -e
+      - POSTGRES_PASSWORD={{ postgres.root.password }}
+      - -e
+      - POSTGRES_DB=postgres
+      - "{{ docker_images.postgres.image }}"
+  when: infisical_postgres_container.rc != 0
   no_log: true
 
 - name: Wait for postgres to accept connections
@@ -99,40 +136,103 @@
   when: infisical_database_exists.stdout | trim != "1"
   no_log: true
 
-- name: Ensure Infisical redis container is started
-  containers.podman.podman_container:
-    image: "{{ docker_images.redis.image }}"
-    name: redis
-    state: started
-    recreate: true
-    volumes:
+- name: Inspect redis container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - -f
+      - "{% raw %}{{.State.Status}}{% endraw %}"
+      - redis
+  register: infisical_redis_container
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Start existing redis container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - start
+      - redis
+  when:
+    - infisical_redis_container.rc == 0
+    - infisical_redis_container.stdout | trim != "running"
+  no_log: true
+
+- name: Run redis container if missing
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - -d
+      - --name
+      - redis
+      - --network
+      - "{{ docker_network }}"
+      - --network-alias
+      - redis
+      - -v
       - "{{ docker_volumes.redis }}:/data"
-    command:
+      - "{{ docker_images.redis.image }}"
       - redis-server
       - --appendonly
       - "yes"
-    network: "{{ docker_network }}"
-    network_aliases:
-      - redis
+  when: infisical_redis_container.rc != 0
+  no_log: true
 
-- name: Ensure Infisical container is started
-  containers.podman.podman_container:
-    image: "{{ docker_images.infisical.image }}"
-    name: infisical
-    state: started
-    recreate: true
-    ports:
-      - "8080:8080"
-    env:
-      ENCRYPTION_KEY: "{{ infisical.encryption_key }}"
-      AUTH_SECRET: "{{ infisical.auth_secret }}"
-      SITE_URL: "{{ infisical.site_url }}"
-      DB_CONNECTION_URI: "postgresql://{{ postgres.infisical.user }}:{{ postgres.infisical.password }}@postgres:5432/{{ postgres.infisical.db }}"
-      REDIS_URL: "{{ infisical.redis_url }}"
-      NODE_ENV: production
-    network: "{{ docker_network }}"
-    network_aliases:
+- name: Inspect Infisical container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - -f
+      - "{% raw %}{{.State.Status}}{% endraw %}"
       - infisical
+  register: infisical_service_container
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Start existing Infisical container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - start
+      - infisical
+  when:
+    - infisical_service_container.rc == 0
+    - infisical_service_container.stdout | trim != "running"
+  no_log: true
+
+- name: Run Infisical container if missing
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - -d
+      - --name
+      - infisical
+      - --network
+      - "{{ docker_network }}"
+      - --network-alias
+      - infisical
+      - -p
+      - "8080:8080"
+      - -e
+      - ENCRYPTION_KEY={{ infisical.encryption_key }}
+      - -e
+      - AUTH_SECRET={{ infisical.auth_secret }}
+      - -e
+      - SITE_URL={{ infisical.site_url }}
+      - -e
+      - DB_CONNECTION_URI=postgresql://{{ postgres.infisical.user }}:{{ postgres.infisical.password }}@postgres:5432/{{ postgres.infisical.db }}
+      - -e
+      - REDIS_URL={{ infisical.redis_url }}
+      - -e
+      - NODE_ENV=production
+      - "{{ docker_images.infisical.image }}"
+  when: infisical_service_container.rc != 0
   no_log: true
 
 - name: Wait for Infisical HTTP endpoint

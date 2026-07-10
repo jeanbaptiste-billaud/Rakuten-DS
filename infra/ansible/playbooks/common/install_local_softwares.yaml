@@ -4,6 +4,7 @@
 - name: Install local softwares
   hosts: all
   gather_facts: true
+  serial: 1
   become: true
 
   tasks:
@@ -12,6 +13,9 @@
 
     - name: Install snap
       ansible.builtin.include_tasks: tasks/utils/install_snap.yaml
+
+    - name: Install Terraform
+      ansible.builtin.include_tasks: tasks/terraform/install_terraform.yaml
 
     - name: Install Bitwarden CLI
       community.general.snap:

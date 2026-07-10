@@ -1,4 +1,11 @@
 ---
+- name: Define Infisical bootstrap paths
+  ansible.builtin.set_fact:
+    infisical_project_root: "{{ project_root }}"
+    infisical_bootstrap_state_dir: "{{ project_root }}"
+    infisical_bootstrap_state_file: "{{ project_root }}/infisical-bootstrap.json"
+    infisical_bootstrap_log_file: "{{ project_root }}/infisical-bootstrap.log"
+
 - name: Build Infisical seed sources
   ansible.builtin.set_fact:
     infisical_seed_sources:
@@ -27,7 +34,7 @@
       {{
         lookup(
           'ansible.builtin.template',
-          playbook_dir ~ '/tasks/infisical/templates/runtime_secrets.yaml.j2'
+          infisical_project_root ~ '/infra/ansible/playbooks/bootstrap/tasks/infisical/templates/runtime_secrets.yaml.j2'
         ) | from_yaml | default([], true)
       }}
   no_log: true
@@ -38,25 +45,25 @@
       {{
         lookup(
           'ansible.builtin.template',
-          playbook_dir ~ '/tasks/infisical/templates/seed_secrets.yaml.j2'
+          infisical_project_root ~ '/infra/ansible/playbooks/bootstrap/tasks/infisical/templates/seed_secrets.yaml.j2'
         ) | from_yaml | default([], true)
       }}
   no_log: true
 
 - name: Ensure local Infisical state directory exists
   ansible.builtin.file:
-    path: "{{ infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') }}"
+    path: "{{ infisical_bootstrap_state_dir }}"
     state: directory
     mode: "0700"
 
 - name: Check Infisical bootstrap state
   ansible.builtin.stat:
-    path: "{{ infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json') }}"
+    path: "{{ infisical_bootstrap_state_file }}"
   register: infisical_bootstrap_state
 
 - name: Load existing Infisical bootstrap state
   ansible.builtin.slurp:
-    src: "{{ infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json') }}"
+    src: "{{ infisical_bootstrap_state_file }}"
   register: infisical_existing_bootstrap_state_content
   when: infisical_bootstrap_state.stat.exists
   no_log: true
@@ -78,44 +85,63 @@
       '--password',
       infisical.bootstrap.admin_password,
       '--organization',
-      infisical.bootstrap.organization_name,
-      '--output',
-      'json'
+      infisical.bootstrap.organization_name
     ] }}"
   register: infisical_bootstrap_result
   when: not infisical_bootstrap_state.stat.exists
-  failed_when: false
+  changed_when: infisical_bootstrap_result.rc == 0
+  failed_when:
+    - infisical_bootstrap_result.rc != 0
+    - "'already been bootstrapped' not in (infisical_bootstrap_result.stderr | default(''))"
   no_log: true
+
+# - name: Persist Infisical bootstrap log
+#   ansible.builtin.copy:
+#     dest: "{{ infisical_bootstrap_log_file }}"
+#     content: >-
+#       {{
+#         [
+#           'rc=' ~ (infisical_bootstrap_result.rc | default(-1) | string),
+#           'stdout:',
+#           infisical_bootstrap_result.stdout | default(''),
+#           'stderr:',
+#           infisical_bootstrap_result.stderr | default('')
+#         ] | join('\n')
+#       }}
+#     mode: "0600"
+#   when: not infisical_bootstrap_state.stat.exists
+#   no_log: true
 
 - name: Detect usable Infisical bootstrap output
   ansible.builtin.set_fact:
-    infisical_bootstrap_has_json_output: "{{ (infisical_bootstrap_result.stdout | default('') | trim).startswith('{') }}"
+    infisical_bootstrap_has_json_output: >-
+      {{
+        infisical_bootstrap_result.rc == 0
+        and
+        (infisical_bootstrap_result.stdout | default('') | trim).startswith('{')
+      }}
   when: not infisical_bootstrap_state.stat.exists
   no_log: true
 
 - name: Parse Infisical bootstrap output
   ansible.builtin.set_fact:
-    infisical_bootstrap_output: "{{ infisical_bootstrap_result.stdout | from_json }}"
-    infisical_bootstrap_token: "{{ (infisical_bootstrap_result.stdout | from_json).identity.credentials.token }}"
-  when:
-    - not infisical_bootstrap_state.stat.exists
-    - infisical_bootstrap_has_json_output | bool
-  no_log: true
-
-- name: Persist Infisical bootstrap token state
-  ansible.builtin.copy:
-    dest: "{{ infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json') }}"
-    content: >-
+    infisical_bootstrap_output: >-
       {{
-        {
-          'token': infisical_bootstrap_token,
-          'bootstrap': infisical_bootstrap_output
-        } | to_nice_json
+        infisical_bootstrap_result.stdout
+        | trim
+        | from_json
       }}
-    mode: "0600"
+    infisical_bootstrap_token: >-
+      {{
+        (
+          infisical_bootstrap_result.stdout
+          | trim
+          | from_json
+        ).identity.credentials.token
+      }}
   when:
     - not infisical_bootstrap_state.stat.exists
-    - infisical_bootstrap_token is defined
+    - infisical_bootstrap_has_json_output | default(false) | bool
   no_log: true
 
 - name: Login to already bootstrapped Infisical instance
@@ -132,6 +158,9 @@
     return_content: true
     status_code: 200
   register: infisical_admin_login_response
+  retries: 20
+  delay: 3
+  until: infisical_admin_login_response.status == 200
   when:
     - not infisical_bootstrap_state.stat.exists
     - infisical_bootstrap_token is not defined
@@ -152,6 +181,22 @@
   ansible.builtin.set_fact:
     infisical_bootstrap_token: "{{ infisical_bootstrap_state_data.token }}"
   when: infisical_bootstrap_state.stat.exists
+  no_log: true
+
+- name: Persist Infisical bootstrap token state
+  ansible.builtin.copy:
+    dest: "{{ infisical_bootstrap_state_file }}"
+    content: >-
+      {{
+        {
+          'token': infisical_bootstrap_token,
+          'bootstrap': infisical_bootstrap_output | default(infisical_bootstrap_state_data.bootstrap | default({}))
+        } | to_nice_json
+      }}
+    mode: "0600"
+  when:
+    - not infisical_bootstrap_state.stat.exists
+    - infisical_bootstrap_token is defined
   no_log: true
 
 - name: Select existing Infisical project id
@@ -210,7 +255,7 @@
 
 - name: Persist Infisical project state
   ansible.builtin.copy:
-    dest: "{{ infisical_bootstrap_state_file | default(infisical_bootstrap_state_dir | default(ansible_env.HOME ~ '/.config/rakuten/infisical') ~ '/bootstrap.json') }}"
+    dest: "{{ infisical_bootstrap_state_file }}"
     content: >-
       {{
         {

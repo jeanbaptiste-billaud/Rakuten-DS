@@ -23,105 +23,55 @@
     repo_name: Rakuten-DS
     repo_branch: dvc
     repo_url: https://github.com/jeanbaptiste-billaud/Rakuten-DS.git
+    bootstrap_repo_dir: "{{ workdir }}/dvc_data"
+    bootstrap_logs_mount: "{{ workdir }}/logs_and_reports"
+    bootstrap_minio_image: "minio/minio:RELEASE.2025-09-07T16-13-09Z"
+    bootstrap_minio_health_url: "http://127.0.0.1:9000/minio/health/live"
+    bootstrap_postgres_dumps:
+      - name: airflow
+        db: "{{ postgres.airflow.db }}"
+      - name: mlflow
+        db: "{{ postgres.mlflow.db }}"
 
   tasks:
     - name: Create podman volumes
-      include_tasks: "tasks/podman_volume.yaml"
+      ansible.builtin.include_tasks:
+        file: tasks/podman_volume.yaml
+        apply:
+          tags: [init]
+      tags: [init]
 
     - name: Create Podman network
       containers.podman.podman_network:
         name: "{{ docker_network }}"
         state: present
+        disable_dns: false
+      tags: [init]
 
-    - name: git
-      block:
-        - name: Check if DVC repo exists
-          ansible.builtin.stat:
-            path: "{{ volume_mountpoints.dvc }}/.git"
-          register: dvc_repo
+    - name: Bootstrap DVC data
+      ansible.builtin.include_tasks: tasks/dvc/bootstrap_dvc.yaml
 
-        - name: clone repository
-          containers.podman.podman_container:
-            name: dvc
-            image: "{{ docker_images.dvc.image }}"
-            rm: true
-            recreate: true
-            detach: false
-            workdir: "{{ workdir }}/dvc_data"
-            volumes:
-              - "dvc_data:{{ workdir }}/dvc_data"
-            command: "git clone --branch {{ repo_branch }} --single-branch {{ repo_url }} ."
-          when: not dvc_repo.stat.exists
+    - name: Extract logs and reports archive
+      containers.podman.podman_container:
+        image: "{{ docker_images.dvc.image }}"
+        name: dvc
+        rm: true
+        recreate: true
+        detach: false
+        workdir: "{{ bootstrap_repo_dir }}"
+        volumes:
+          - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+          - "{{ docker_volumes.logs }}:{{ bootstrap_logs_mount }}"
+        command:
+          - sh
+          - -c
+          - "tar -xzf data/logs_and_reports.tar.gz -C {{ workdir }}"
 
-    - name: dvc
-      block:
-        - name: setup dagshub repo
-          containers.podman.podman_container:
-            image: "{{ docker_images.dvc.image }}"
-            name: dvc
-            rm: true
-            recreate: true
-            detach: false
-            workdir: "{{ workdir }}/dvc_data"
-            volumes:
-              - "dvc_data:{{ workdir }}/dvc_data"
-            command:
-              - sh
-              - -c
-              - |
-                set -e
-                
-                dvc remote modify origin --local auth basic
-                dvc remote modify origin --local user "{{ dagshub.user }}"
-                dvc remote modify origin --local password "{{ dagshub.password }}"
-          no_log: true
+    - name: Restore Postgres databases
+      ansible.builtin.include_tasks: tasks/postgres/bootstrap_postgres.yaml
 
-        - name: Find dvc files
-          ansible.builtin.include_vars:
-            file: "{{ volume_mountpoints.dvc }}/.dvc/dvc_tracking_list.yaml"
+    - name: Initialize MinIO
+      ansible.builtin.include_tasks: tasks/minio/bootstrap_minio.yaml
 
-        - name: pull dvc data
-          containers.podman.podman_container:
-            name: dvc
-            image: "{{ docker_images.dvc.image }}"
-            rm: true
-            recreate: true
-            detach: false
-            workdir: "{{ workdir }}/dvc_data"
-            volumes:
-              - "dvc_data:{{ workdir }}/dvc_data"
-            command: "dvc pull {{ item }}"
-          loop: "{{ dvc_targets }}" # nom de la variable du fichier yaml
-
-        - name: remove dvc local config file
-          containers.podman.podman_container:
-            image: "{{ docker_images.dvc.image }}"
-            name: dvc
-            rm: true
-            recreate: true
-            detach: false
-            workdir: "{{ workdir }}/dvc_data"
-            volumes:
-              - "dvc_data:{{ workdir }}/dvc_data"
-            command:
-              - sh
-              - -c
-              - rm -f .dvc/config.local
-
-    - name: pgsql
-      block:
-        - name: Create postgres admin role
-          containers.podman.podman_container:
-            image: "{{ docker_images.postgres.image }}"
-            name: postgres
-            state: started
-            volumes:
-              - pgdata:/var/lib/postgresql/data
-              - dvc_data:/dvc_data
-            env:
-              POSTGRES_USER: "{{ postgres.root.user }}"
-              POSTGRES_PASSWORD: "{{ postgres.root.password }}"
-              POSTGRES_DB: postgres
-            networks:
-              - name: "{{ docker_network }}"
-
+    - name: Setup MinIO runtime access
+      ansible.builtin.include_tasks: tasks/minio/bootstrap_runtime_access.yaml

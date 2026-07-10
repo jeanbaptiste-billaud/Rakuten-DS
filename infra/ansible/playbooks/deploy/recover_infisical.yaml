@@ -1,0 +1,16 @@
+---
+- name: Recover Infisical service stack
+  hosts: deploy
+  connection: local
+  gather_facts: true
+
+  vars:
+    infisical_install_host_cli: true
+    infisical_configure_with_terraform: true
+    infisical_cli_command:
+      - infisical
+
+  tasks:
+    - name: Recover Infisical service dependencies and runtime
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../bootstrap/tasks/infisical/setup_infisical.yaml"

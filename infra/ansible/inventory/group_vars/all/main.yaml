@@ -5,12 +5,12 @@ docker_project: "rakuten"
 
 docker_repository: "{{ docker_registry }}/{{ docker_namespace }}/{{ docker_project }}"
 
-docker_volumes:
-  dvc: "dvc_data"
-  postgres: "pgdata"
-  logs: "logs_and_reports"
-  redis: "redis_data"
+docker_infra: "{{ lookup('ansible.builtin.file', inventory_dir ~ '/../../config/docker.yaml') | from_yaml }}"
 
-docker_network: "rakuten_network"
+docker_volumes: "{{ docker_infra.volumes }}"
+docker_volume_items: "{{ docker_infra.volumes | dict2items }}"
+docker_volume_names: "{{ docker_volume_items | map(attribute='value') | list }}"
+
+docker_network: "{{ docker_infra.network.name }}"
 
 ansible_vault_file: "{{ inventory_dir }}/group_vars/all/secrets.vault.yaml"
