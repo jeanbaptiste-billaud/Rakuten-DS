@@ -1,8 +1,5 @@
 INFISICAL_DOMAIN={{ infisical.site_url }}
 INFISICAL_ENV={{ infisical.bootstrap.environment_slug }}
 INFISICAL_PROJECT_ID={{ infisical_project_id }}
-{% for item in infisical_terraform_output_data.identity_universal_auth.value | dict2items %}
-{% set env_name = item.key | upper | replace('-', '_') %}
-INFISICAL_{{ env_name }}_CLIENT_ID={{ item.value.client_id }}
-INFISICAL_{{ env_name }}_CLIENT_SECRET={{ item.value.client_secret }}
-{% endfor %}
+INFISICAL_DEPLOY_ID_CLIENT_ID={{ infisical_terraform_output_data.terraform_identity_universal_auth.value.client_id }}
+INFISICAL_DEPLOY_ID_CLIENT_SECRET={{ infisical_terraform_output_data.terraform_identity_universal_auth.value.client_secret }}

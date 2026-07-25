@@ -28,5 +28,9 @@ docker_images:
     image: docker.io/library/redis:7-alpine
   infisical:
     image: docker.io/infisical/infisical:latest-postgres
+  spire_server:
+    image: dhi.io/spire-server:1.15
+  spire_agent:
+    image: dhi.io/spire-agent:1
 
 workdir: "/app"

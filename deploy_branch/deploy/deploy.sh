@@ -56,8 +56,8 @@ load_infisical_terraform_outputs() {
   export INFISICAL_DEPLOY_ID_CLIENT_SECRET
 
   INFISICAL_PROJECT_ID="$(jq -r '.project_id.value // empty' "${outputs_file}")"
-  INFISICAL_DEPLOY_ID_CLIENT_ID="$(jq -r '.identity_universal_auth.value["deploy-id"].client_id // empty' "${outputs_file}")"
-  INFISICAL_DEPLOY_ID_CLIENT_SECRET="$(jq -r '.identity_universal_auth.value["deploy-id"].client_secret // empty' "${outputs_file}")"
+  INFISICAL_DEPLOY_ID_CLIENT_ID="$(jq -r '.terraform_identity_universal_auth.value.client_id // empty' "${outputs_file}")"
+  INFISICAL_DEPLOY_ID_CLIENT_SECRET="$(jq -r '.terraform_identity_universal_auth.value.client_secret // empty' "${outputs_file}")"
   INFISICAL_ENV="${INFISICAL_ENV:-dev}"
   INFISICAL_DOMAIN="${INFISICAL_DOMAIN:-http://127.0.0.1:8080}"
 

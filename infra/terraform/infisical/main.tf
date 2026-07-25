@@ -89,7 +89,10 @@ resource "infisical_identity" "identities" {
 }
 
 resource "infisical_identity_universal_auth" "universal_auth" {
-  for_each = var.identities
+  for_each = {
+    for name, identity in var.identities : name => identity
+    if name == var.terraform_identity_name
+  }
 
   identity_id                 = infisical_identity.identities[each.key].id
   access_token_ttl            = 3600
@@ -110,10 +113,13 @@ resource "infisical_identity_universal_auth" "universal_auth" {
 }
 
 resource "infisical_identity_universal_auth_client_secret" "client_secrets" {
-  for_each = var.identities
+  for_each = {
+    for name, identity in var.identities : name => identity
+    if name == var.terraform_identity_name
+  }
 
   identity_id = infisical_identity.identities[each.key].id
-  description = "Terraform managed Universal Auth client secret for ${each.key}."
+  description = "Terraform provider Universal Auth client secret."
 
   depends_on = [
     infisical_identity_universal_auth.universal_auth
@@ -140,8 +146,8 @@ resource "infisical_project_identity_specific_privilege" "identity_privileges" {
         for path in concat(
           identity.path != null && identity.path != "" ? [identity.path] : [],
           identity.paths
-        ) : {
-          key         = "${identity_name}:${path}"
+          ) : {
+          key          = "${identity_name}:${path}"
           identity_id  = infisical_project_identity.project_identities[identity_name].identity_id
           project_slug = infisical_project.rakuten.slug
           slug         = identity_name

@@ -38,3 +38,9 @@ variable "identities" {
   }))
   description = "Machine identities and their scoped secret path."
 }
+
+variable "terraform_identity_name" {
+  type        = string
+  description = "Only machine identity allowed to use Universal Auth for Terraform operations."
+  default     = "deploy-id"
+}
