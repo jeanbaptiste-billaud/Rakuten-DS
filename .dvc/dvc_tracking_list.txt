@@ -1,0 +1,4 @@
+# Données nécessaires à la classification textuelle
+data/raw/all_raw_data.csv.dvc
+data/preprocessed.dvc
+data/dataset.dvc

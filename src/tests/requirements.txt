@@ -1,0 +1,10 @@
+joblib
+matplotlib
+numpy
+pandas
+pytest
+scikit-learn==1.7.2
+seaborn
+shap
+spacy
+tqdm

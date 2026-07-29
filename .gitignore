@@ -1,0 +1,6 @@
+/Raw_data/
+**/.ipynb_checkpoints/**
+**/__pycache__/**
+*.npz
+logs/
+*.log
