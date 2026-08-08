@@ -22,7 +22,7 @@ resource "docker_container" "postgres" {
 
   volumes {
     volume_name    = var.volume_names["pgdata"]
-    container_path = "/var/lib/postgresql/data"
+    container_path = "/var/lib/postgresql/17/data"
   }
 
   volumes {

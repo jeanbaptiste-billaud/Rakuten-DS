@@ -15,3 +15,10 @@ output "terraform_identity_universal_auth" {
   }
 }
 
+output "identity_ids" {
+  description = "Public identity UUIDs to inject into SPIFFE-authenticated workloads."
+  value = {
+    for name, identity in infisical_identity.identities : name => identity.id
+  }
+}
+

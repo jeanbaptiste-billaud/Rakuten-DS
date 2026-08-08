@@ -9,6 +9,8 @@ from common_task import (
     docker_common_args,
     end_pipeline_task,
     infisical_run_command,
+    infisical_run_argv,
+    security_mounts,
     pg_dump_task,
     start_pipeline_task,
     volume_backup_task,
@@ -28,9 +30,10 @@ def minio_backup_task():
     )
     return DockerOperator(
         task_id='backup_minio_volume',
-        image="jbbillaud/rakuten:minio-client-RELEASE.2025-08-13T08-35-41Z",
-        mounts=[Mount(source="dvc_data", target="/dvc_data", type="volume")],
-        command=infisical_run_command("/src/minio_backup.sh > /proc/1/fd/1 2>&1", identity),
+        image="jbbillaud/rakuten:minio-client-latest",
+        user="0:0",
+        mounts=security_mounts(Mount(source="dvc_data", target="/dvc_data", type="volume")),
+        command=infisical_run_argv(["python", "-m", "src.minio.minio_backup"], identity),
         doc_md="""
         ### 🐳 Docker task
         - Lance un conteneur minio-client
@@ -47,7 +50,9 @@ def commit_task():
     return DockerOperator(
         task_id='git_dvc_commit',
         image='jbbillaud/rakuten:dvc-v3.66.1',
-        mounts=[Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume")],
+        mounts=security_mounts(
+            Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume")
+        ),
         command=infisical_run_command(f"""
         sh -c "set -e
         cd '{repo}'

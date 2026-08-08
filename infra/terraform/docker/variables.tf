@@ -130,12 +130,8 @@ variable "infisical_project_id" {
   default     = ""
 }
 
-variable "infisical_identity_credentials" {
-  description = "Universal Auth credentials injected into Airflow, keyed by identity basename such as data_ingestion or model_build."
-  type = map(object({
-    client_id     = string
-    client_secret = string
-  }))
-  sensitive = true
-  default   = {}
+variable "infisical_identity_ids" {
+  description = "Infisical machine identity UUIDs keyed by Terraform identity name, such as data-ingestion-id."
+  type        = map(string)
+  default     = {}
 }

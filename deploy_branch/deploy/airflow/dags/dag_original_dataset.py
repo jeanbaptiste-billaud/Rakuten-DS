@@ -5,6 +5,7 @@ from common_task import (
     docker_common_args,
     end_pipeline_task,
     infisical_run_command,
+    security_mounts,
     preprocess_task,
     start_pipeline_task,
 )
@@ -29,6 +30,7 @@ def dataset_task():
     """
     return DockerOperator(
         task_id='create_dataset',
+        mounts=security_mounts(),
         image="jbbillaud/rakuten:spacy-v3.8.11",
         command=infisical_run_command(script, identity),
         **common_args

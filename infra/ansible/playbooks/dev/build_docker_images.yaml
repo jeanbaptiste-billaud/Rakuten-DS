@@ -39,6 +39,24 @@
       ansible.builtin.set_fact:
         docker_repository: "{{ library_catalog.images.repository }}"
 
+    - name: Login to Docker Hub with Podman
+      tags:
+        - always
+      vars:
+        podman_docker_hub_login_required: "{{ push | default(true) | bool }}"
+        podman_registry_auth_file: "{{ ansible_facts.env.HOME }}/.config/containers/auth.json"
+      ansible.builtin.include_tasks:
+        file: ../common/tasks/podman/login_docker_hub.yaml
+
+    - name: Login to DHI with Podman
+      tags:
+        - always
+      vars:
+        podman_dhi_login_required: true
+        podman_registry_auth_file: "{{ ansible_facts.env.HOME }}/.config/containers/auth.json"
+      ansible.builtin.include_tasks:
+        file: ../common/tasks/podman/login_dhi.yaml
+
     - name: Check Pixi image
       tags:
         - always

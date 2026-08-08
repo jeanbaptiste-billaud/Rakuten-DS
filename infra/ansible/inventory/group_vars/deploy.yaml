@@ -22,8 +22,14 @@ docker_images:
     image: "{{ docker_repository }}:streamlit-latest"
   airflow:
     image: "{{ docker_repository }}:airflow-latest"
+  postgres-backup:
+    image: "{{ docker_repository }}:postgres-backup-latest"
   postgres:
-    image: docker.io/library/postgres:17
+    image: dhi.io/postgres:17
+  spire-server:
+    image: dhi.io/spire-server:1.15.1
+  spire-agent:
+    image: dhi.io/spire-agent:1.15.1
   redis:
     image: docker.io/library/redis:7-alpine
   infisical:
@@ -34,3 +40,28 @@ docker_images:
     image: dhi.io/spire-agent:1
 
 workdir: "/app"
+
+spire:
+  trust_domain: rakuten.local
+  server_port: 8081
+  bundle_endpoint_port: 8443
+  bundle_refresh_hint: 1h
+  bundle_dns_name: spire-server
+  tls_dir: "{{ ansible_facts.env.HOME }}/.config/rakuten/spire/tls"
+  server_uid: 65532
+  server_gid: 65532
+  agent_spiffe_id: spiffe://rakuten.local/agent/rakuten-host
+  config_dir: "{{ ansible_facts.env.HOME }}/.config/rakuten/spire"
+  socket_path: /run/spire/sockets/agent.sock
+  podman_socket_host: "/run/user/{{ ansible_facts.user_uid }}/podman/podman.sock"
+  podman_socket_container: /run/podman/podman.sock
+  workloads:
+    - data-ingestion
+    - data-enrichment
+    - data-preprocessing
+    - training
+    - model-evaluation
+    - model-build
+    - backup
+    - postgres-backup
+    - dvc-publisher

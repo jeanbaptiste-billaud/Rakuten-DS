@@ -17,6 +17,9 @@
     - name: Install Terraform
       ansible.builtin.include_tasks: tasks/terraform/install_terraform.yaml
 
+    - name: Install Infisical CLI
+      ansible.builtin.include_tasks: tasks/infisical/install_infisical_cli.yaml
+
     - name: Install Bitwarden CLI
       community.general.snap:
         name: bw

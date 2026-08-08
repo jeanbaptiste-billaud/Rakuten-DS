@@ -16,7 +16,7 @@
 - name: Create MinIO runtime users and attach policies
   containers.podman.podman_container:
     name: "minio-runtime-access-{{ item.name }}"
-    image: "{{ docker_images['minio-client'].image }}"
+    image: "{{ bootstrap_minio_client_image }}"
     rm: true
     recreate: true
     detach: false
@@ -29,14 +29,14 @@
       MINIO_ACCESS_KEY: "{{ item.access_key }}"
       MINIO_SECRET_KEY: "{{ item.secret_key }}"
       MINIO_POLICY_NAME: "{{ item.policy_name }}"
-    entrypoint:
-      - /bin/sh
+    entrypoint: /bin/sh
+    command:
       - -lc
-    command: |
+      - |
       set -e
-      mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
-      mc admin user add local "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" || true
-      mc admin policy create local "$MINIO_POLICY_NAME" "/policies/${MINIO_POLICY_NAME}.json" || true
-      mc admin policy attach local "$MINIO_POLICY_NAME" --user "$MINIO_ACCESS_KEY"
+        mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+        mc admin user add local "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" || true
+        mc admin policy create local "$MINIO_POLICY_NAME" "/policies/${MINIO_POLICY_NAME}.json" || true
+        mc admin policy attach local "$MINIO_POLICY_NAME" --user "$MINIO_ACCESS_KEY"
   loop: "{{ minio_runtime_accounts }}"
   no_log: true

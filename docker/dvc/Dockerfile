@@ -18,6 +18,7 @@ RUN pixi install -e ${PIXI_ENV} --locked \
 
 RUN mkdir -p /src && touch /src/__init__.py
 COPY src/utils/generate_data_lineage.py /src/generate_data_lineage.py
+COPY src/security /src/security
 
 RUN groupadd -g 1000 trainusr \
  && useradd -u 1000 -g trainusr -m -s /bin/bash trainusr

@@ -1,12 +1,26 @@
 ---
+- name: Validate PostgreSQL Vault configuration
+  ansible.builtin.assert:
+    that:
+      - postgres.root.user is match('^[A-Za-z_][A-Za-z0-9_]{0,62}$')
+      - postgres.root.password | length > 0
+      - item.user is match('^[A-Za-z_][A-Za-z0-9_]{0,62}$')
+      - item.password | length > 0
+      - item.db is not defined or item.db is match('^[A-Za-z_][A-Za-z0-9_]{0,62}$')
+    fail_msg: >-
+      PostgreSQL role names and database names must be simple SQL identifiers,
+      and every managed role must have a password in Ansible Vault.
+  loop: "{{ bootstrap_postgres_services }}"
+  no_log: true
+
 - name: Start postgres container
   containers.podman.podman_container:
     image: "{{ docker_images.postgres.image }}"
     name: postgres
     state: started
-    recreate: true
+    recreate: false
     volumes:
-      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
+      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/17/data:U"
       - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}:ro"
     env:
       POSTGRES_USER: "{{ postgres.root.user }}"
@@ -34,26 +48,189 @@
   until: bootstrap_postgres_ready.rc == 0
   changed_when: false
   no_log: true
+- name: Synchronize PostgreSQL root password with Ansible Vault
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - >-
+        ALTER ROLE "{{ postgres.root.user }}"
+        WITH LOGIN PASSWORD '{{ postgres.root.password }}';
+  changed_when: false
+  no_log: true
 
-- name: Restore postgres dumps
-  containers.podman.podman_container:
-    image: "{{ docker_images.postgres.image }}"
-    name: "postgres-restore-{{ item.name }}"
-    rm: true
-    recreate: true
-    detach: false
-    network: "{{ docker_network }}"
-    volumes:
-      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}:ro"
-    env:
-      PGPASSWORD: "{{ postgres.root.password }}"
-    entrypoint:
-      - /bin/sh
-      - -lc
-    command: |
-      set -e
-      dump_file="{{ bootstrap_repo_dir }}/data/pg_backups/{{ item.name }}.dump"
-      pg_restore -h postgres -U "{{ postgres.root.user }}" -d postgres --create --clean --if-exists --no-owner --no-privileges "$dump_file"
-      psql -h postgres -U "{{ postgres.root.user }}" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '{{ item.db }}';" | grep -q '^1$'
+- name: Create or update PostgreSQL service roles
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - >-
+        DO $$ BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ item.user }}') THEN
+          CREATE ROLE "{{ item.user }}" LOGIN PASSWORD '{{ item.password }}';
+        ELSE
+          ALTER ROLE "{{ item.user }}" WITH LOGIN PASSWORD '{{ item.password }}';
+        END IF;
+        END $$;
+  loop: "{{ bootstrap_postgres_services }}"
+  changed_when: false
+  no_log: true
+
+
+- name: Check databases before restoring PostgreSQL dumps
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_database WHERE datname='{{ item.db }}'"
   loop: "{{ bootstrap_postgres_dumps }}"
+  register: bootstrap_postgres_pre_restore_checks
+  changed_when: false
+  no_log: true
+
+- name: Restore missing PostgreSQL databases
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - /opt/postgresql/17/bin/pg_restore
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - --create
+      - --no-owner
+      - --no-privileges
+      - "{{ bootstrap_repo_dir }}/data/pg_backups/{{ item.item.file }}"
+  loop: "{{ bootstrap_postgres_pre_restore_checks.results }}"
+  when:
+    - not ansible_check_mode
+    - not (postgres_force_restore | bool)
+    - item.stdout | trim != '1'
+  changed_when: true
+  no_log: true
+
+- name: Force restore PostgreSQL databases
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - /opt/postgresql/17/bin/pg_restore
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - --create
+      - --clean
+      - --if-exists
+      - --no-owner
+      - --no-privileges
+      - "{{ bootstrap_repo_dir }}/data/pg_backups/{{ item.file }}"
+  loop: "{{ bootstrap_postgres_dumps }}"
+  when:
+    - not ansible_check_mode
+    - postgres_force_restore | bool
+  changed_when: true
+  no_log: true
+
+- name: Validate restored PostgreSQL databases
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_database WHERE datname='{{ item.db }}'"
+  loop: "{{ bootstrap_postgres_dumps }}"
+  register: bootstrap_postgres_restore_checks
+  changed_when: false
+  failed_when: bootstrap_postgres_restore_checks.stdout | trim != '1'
+  no_log: true
+
+- name: Check managed PostgreSQL databases
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_database WHERE datname='{{ item.db }}'"
+  loop: "{{ bootstrap_postgres_services | selectattr('db', 'defined') | list }}"
+  register: bootstrap_postgres_database_checks
+  changed_when: false
+  no_log: true
+
+- name: Create missing PostgreSQL databases
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - createdb
+      - -U
+      - "{{ postgres.root.user }}"
+      - -O
+      - "{{ item.item.user }}"
+      - "{{ item.item.db }}"
+  loop: "{{ bootstrap_postgres_database_checks.results }}"
+  when:
+    - not ansible_check_mode
+    - item.stdout | trim != '1'
+  no_log: true
+
+- name: Enforce PostgreSQL database ownership
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - postgres
+      - psql
+      - -U
+      - "{{ postgres.root.user }}"
+      - -d
+      - postgres
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - >-
+        ALTER DATABASE "{{ item.db }}" OWNER TO "{{ item.user }}";
+  loop: "{{ bootstrap_postgres_services | selectattr('db', 'defined') | list }}"
+  changed_when: false
   no_log: true

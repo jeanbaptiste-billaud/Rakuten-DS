@@ -1,0 +1,353 @@
+---
+- name: Validate SPIRE configuration
+  ansible.builtin.assert:
+    that:
+      - spire.trust_domain is match('^[a-z0-9.-]+$')
+      - spire.agent_spiffe_id == 'spiffe://' ~ spire.trust_domain ~ '/agent/rakuten-host'
+      - spire.bundle_dns_name is match('^[a-z0-9.-]+$')
+      - spire.bundle_endpoint_port | int > 0
+      - spire.bundle_endpoint_port | int < 65536
+      - spire.server_uid | int > 0
+      - spire.server_gid | int > 0
+    fail_msg: "SPIRE trust domain and agent SPIFFE ID are inconsistent"
+
+- name: Inspect rootless Podman API socket
+  ansible.builtin.stat:
+    path: "{{ spire.podman_socket_host }}"
+  register: spire_podman_socket
+
+- name: Require a running rootless Podman API socket
+  ansible.builtin.assert:
+    that:
+      - spire_podman_socket.stat.exists
+      - spire_podman_socket.stat.issock | default(false)
+    fail_msg: >-
+      Podman socket {{ spire.podman_socket_host }} is unavailable.
+      Start it with: systemctl --user enable --now podman.socket
+- name: Create SPIRE configuration directory
+  ansible.builtin.file:
+    path: "{{ spire.config_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Create SPIRE bundle endpoint TLS directory
+  ansible.builtin.file:
+    path: "{{ spire.tls_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Generate SPIRE bundle endpoint CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ spire.tls_dir }}/ca.key"
+    type: RSA
+    size: 3072
+    mode: "0600"
+
+- name: Generate SPIRE bundle endpoint CA CSR
+  community.crypto.openssl_csr:
+    path: "{{ spire.tls_dir }}/ca.csr"
+    privatekey_path: "{{ spire.tls_dir }}/ca.key"
+    common_name: Rakuten SPIRE Bundle Endpoint CA
+    basic_constraints:
+      - CA:TRUE
+    basic_constraints_critical: true
+    key_usage:
+      - keyCertSign
+      - cRLSign
+    key_usage_critical: true
+    mode: "0600"
+
+- name: Generate SPIRE bundle endpoint CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ spire.tls_dir }}/ca.crt"
+    csr_path: "{{ spire.tls_dir }}/ca.csr"
+    privatekey_path: "{{ spire.tls_dir }}/ca.key"
+    provider: selfsigned
+    selfsigned_not_after: "+3650d"
+    mode: "0644"
+
+- name: Generate SPIRE bundle endpoint server private key
+  community.crypto.openssl_privatekey:
+    path: "{{ spire.tls_dir }}/server.key"
+    type: RSA
+    size: 3072
+    mode: "0640"
+
+- name: Grant the non-root DHI SPIRE server group access to its TLS key
+  ansible.builtin.command:
+    argv:
+      - podman
+      - unshare
+      - chown
+      - "0:{{ spire.server_gid }}"
+      - "{{ spire.tls_dir }}/server.key"
+  changed_when: false
+  no_log: true
+
+- name: Generate SPIRE bundle endpoint server CSR
+  community.crypto.openssl_csr:
+    path: "{{ spire.tls_dir }}/server.csr"
+    privatekey_path: "{{ spire.tls_dir }}/server.key"
+    common_name: "{{ spire.bundle_dns_name }}"
+    subject_alt_name:
+      - "DNS:{{ spire.bundle_dns_name }}"
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    extended_key_usage:
+      - serverAuth
+    mode: "0600"
+
+- name: Generate SPIRE bundle endpoint server certificate
+  community.crypto.x509_certificate:
+    path: "{{ spire.tls_dir }}/server.crt"
+    csr_path: "{{ spire.tls_dir }}/server.csr"
+    provider: ownca
+    ownca_path: "{{ spire.tls_dir }}/ca.crt"
+    ownca_privatekey_path: "{{ spire.tls_dir }}/ca.key"
+    ownca_not_after: "+825d"
+    mode: "0644"
+  register: spire_bundle_server_certificate
+
+- name: Render SPIRE configuration
+  ansible.builtin.template:
+    src: "spire/{{ item.src }}"
+    dest: "{{ spire.config_dir }}/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: server.conf.j2, dest: server.conf }
+    - { src: agent.conf.j2, dest: agent.conf }
+  register: spire_config
+
+- name: Start SPIRE server
+  containers.podman.podman_container:
+    name: spire-server
+    image: "{{ docker_images['spire-server'].image }}"
+    state: started
+    recreate: "{{ spire_config.changed or spire_bundle_server_certificate.changed }}"
+    restart_policy: unless-stopped
+    command:
+      - -config
+      - /run/spire/config/server.conf
+    volumes:
+      - "{{ spire.config_dir }}/server.conf:/run/spire/config/server.conf:ro,Z"
+      - "{{ spire.tls_dir }}/server.crt:/run/spire/tls/server.crt:ro,Z"
+      - "{{ spire.tls_dir }}/server.key:/run/spire/tls/server.key:ro,Z"
+      - "{{ docker_volumes.spire_server }}:/run/spire/data:U"
+    network: "{{ docker_network }}"
+    network_aliases:
+      - spire-server
+
+- name: Wait for SPIRE server to become healthy
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-server
+      - /usr/local/bin/spire-server
+      - healthcheck
+      - -socketPath
+      - /run/spire/data/server.sock
+  register: spire_server_health
+  retries: 30
+  delay: 2
+  until: spire_server_health.rc == 0
+  changed_when: false
+
+- name: Export SPIRE trust bundle
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-server
+      - /usr/local/bin/spire-server
+      - bundle
+      - show
+      - -format
+      - pem
+      - -socketPath
+      - /run/spire/data/server.sock
+  register: spire_trust_bundle
+  changed_when: false
+
+- name: Install SPIRE trust bundle for the agent
+  ansible.builtin.copy:
+    dest: "{{ spire.config_dir }}/bundle.crt"
+    content: "{{ spire_trust_bundle.stdout }}\n"
+    mode: "0644"
+  register: spire_bundle
+
+- name: Inspect SPIRE agent
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - -f
+      - "{% raw %}{{.State.Status}}{% endraw %}"
+      - spire-agent
+  register: spire_agent_inspect
+  changed_when: false
+  failed_when: false
+
+- name: Check existing SPIRE agent health
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-agent
+      - /opt/spire/bin/spire-agent
+      - healthcheck
+      - -socketPath
+      - "{{ spire.socket_path }}"
+  register: spire_existing_agent_health
+  when:
+    - spire_agent_inspect.rc == 0
+    - spire_agent_inspect.stdout | trim == 'running'
+  changed_when: false
+  failed_when: false
+
+- name: Determine whether the SPIRE agent needs enrollment
+  ansible.builtin.set_fact:
+    spire_agent_needs_enrollment: >-
+      {{ spire_agent_inspect.rc != 0 or
+         spire_agent_inspect.stdout | trim != 'running' or
+         spire_existing_agent_health.rc | default(1) != 0 }}
+
+- name: Generate one-time SPIRE agent join token
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-server
+      - /usr/local/bin/spire-server
+      - token
+      - generate
+      - -socketPath
+      - /run/spire/data/server.sock
+      - -spiffeID
+      - "{{ spire.agent_spiffe_id }}"
+      - -output
+      - json
+  register: spire_join_token_result
+  when: spire_agent_needs_enrollment
+  changed_when: true
+  no_log: true
+
+- name: Extract SPIRE agent join token
+  ansible.builtin.set_fact:
+    spire_join_token: >-
+      {{ (spire_join_token_result.stdout | from_json).value }}
+  when: spire_agent_needs_enrollment
+  no_log: true
+
+- name: Enroll or recover the SPIRE agent
+  containers.podman.podman_container:
+    name: spire-agent
+    image: "{{ docker_images['spire-agent'].image }}"
+    state: started
+    recreate: true
+    restart_policy: unless-stopped
+    pid: host
+    command:
+      - -config
+      - /run/spire/config/agent.conf
+      - -joinToken
+      - "{{ spire_join_token }}"
+    volumes:
+      - "{{ spire.config_dir }}/agent.conf:/run/spire/config/agent.conf:ro,Z"
+      - "{{ spire.config_dir }}/bundle.crt:/run/spire/config/bundle.crt:ro,Z"
+      - "{{ docker_volumes.spire_agent }}:/run/spire/data:U"
+      - "{{ docker_volumes.spire_socket }}:/run/spire/sockets:U"
+      - "{{ spire.podman_socket_host }}:{{ spire.podman_socket_container }}:ro"
+    network: "{{ docker_network }}"
+  when: spire_agent_needs_enrollment
+  no_log: true
+
+- name: Start existing SPIRE agent
+  ansible.builtin.command:
+    argv:
+      - podman
+      - start
+      - spire-agent
+  when:
+    - not spire_agent_needs_enrollment
+    - spire_agent_inspect.stdout | trim != 'running'
+  changed_when: true
+
+- name: Recreate SPIRE agent after configuration changes
+  containers.podman.podman_container:
+    name: spire-agent
+    image: "{{ docker_images['spire-agent'].image }}"
+    state: started
+    recreate: true
+    restart_policy: unless-stopped
+    pid: host
+    command:
+      - -config
+      - /run/spire/config/agent.conf
+    volumes:
+      - "{{ spire.config_dir }}/agent.conf:/run/spire/config/agent.conf:ro,Z"
+      - "{{ spire.config_dir }}/bundle.crt:/run/spire/config/bundle.crt:ro,Z"
+      - "{{ docker_volumes.spire_agent }}:/run/spire/data:U"
+      - "{{ docker_volumes.spire_socket }}:/run/spire/sockets:U"
+      - "{{ spire.podman_socket_host }}:{{ spire.podman_socket_container }}:ro"
+    network: "{{ docker_network }}"
+  when:
+    - not spire_agent_needs_enrollment
+    - spire_config.changed or spire_bundle.changed
+
+- name: Wait for SPIRE Workload API socket
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-agent
+      - /opt/spire/bin/spire-agent
+      - healthcheck
+      - -socketPath
+      - "{{ spire.socket_path }}"
+  register: spire_agent_health
+  retries: 30
+  delay: 2
+  until: spire_agent_health.rc == 0
+  changed_when: false
+
+- name: Inspect registered SPIRE workload entries
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-server
+      - /usr/local/bin/spire-server
+      - entry
+      - show
+      - -spiffeID
+      - "spiffe://{{ spire.trust_domain }}/workload/{{ item }}"
+      - -socketPath
+      - /run/spire/data/server.sock
+  loop: "{{ spire.workloads }}"
+  register: spire_workload_entries
+  changed_when: false
+
+- name: Register container workloads in SPIRE
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - spire-server
+      - /usr/local/bin/spire-server
+      - entry
+      - create
+      - -parentID
+      - "{{ spire.agent_spiffe_id }}"
+      - -spiffeID
+      - "spiffe://{{ spire.trust_domain }}/workload/{{ item.item }}"
+      - -selector
+      - "docker:label:org.rakuten.workload:{{ item.item }}"
+      - -socketPath
+      - /run/spire/data/server.sock
+  loop: "{{ spire_workload_entries.results }}"
+  when: >-
+    ('spiffe://' ~ spire.trust_domain ~ '/workload/' ~ item.item)
+    not in item.stdout
+  changed_when: true

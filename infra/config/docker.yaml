@@ -3,8 +3,11 @@ network:
 
 volumes:
   dvc: dvc_data
-  postgres: pgdata
+  postgres: pgdata_dhi
   logs: logs_and_reports
   redis: redis_data
   minio: minio_data
   airflow: airflow_vol
+  spire_server: spire_server_data
+  spire_agent: spire_agent_data
+  spire_socket: spire_agent_socket

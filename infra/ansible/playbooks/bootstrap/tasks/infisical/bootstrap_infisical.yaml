@@ -20,8 +20,6 @@
         data: "{{ mlflow | default({}) }}"
       - prefix: AIRFLOW
         data: "{{ airflow | default({}) }}"
-      - prefix: JENKINS
-        data: "{{ jenkins | default({}) }}"
       - prefix: DAGSHUB
         data: "{{ dagshub | default({}) }}"
       - prefix: GITHUB_APP

@@ -52,7 +52,8 @@ install_collections
 
 run_playbook \
   infra/ansible/playbooks/common/install_local_softwares.yaml \
-  --limit deploy
+  --limit deploy \
+  -e podman_dhi_login_required=true
 
 run_playbook \
   infra/ansible/playbooks/bootstrap/boostrap_pre_vault.yaml \

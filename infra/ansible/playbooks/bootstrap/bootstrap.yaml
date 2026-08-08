@@ -27,51 +27,88 @@
     bootstrap_logs_mount: "{{ workdir }}/logs_and_reports"
     bootstrap_minio_image: "minio/minio:RELEASE.2025-09-07T16-13-09Z"
     bootstrap_minio_health_url: "http://127.0.0.1:9000/minio/health/live"
+    bootstrap_minio_client_image: "docker.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727"
+    postgres_force_restore: false
     bootstrap_postgres_dumps:
       - name: airflow
         db: "{{ postgres.airflow.db }}"
+        file: airflow_db.dump
       - name: mlflow
         db: "{{ postgres.mlflow.db }}"
+        file: mlflow_db.dump
+    bootstrap_postgres_services:
+      - "{{ postgres.admin }}"
+      - "{{ postgres.airflow }}"
+      - "{{ postgres.mlflow }}"
+      - "{{ postgres.infisical }}"
 
   tasks:
     - name: Create podman volumes
       ansible.builtin.include_tasks:
         file: tasks/podman_volume.yaml
         apply:
-          tags: [init]
-      tags: [init]
+          tags: [always]
+      tags: [always]
 
     - name: Create Podman network
       containers.podman.podman_network:
         name: "{{ docker_network }}"
         state: present
         disable_dns: false
-      tags: [init]
+      tags: [always]
+
+    - name: Bootstrap SPIRE trust domain
+      ansible.builtin.include_tasks:
+        file: tasks/spire/bootstrap_spire.yaml
+        apply:
+          tags: [security, spire]
+      tags: [security, spire]
 
     - name: Bootstrap DVC data
-      ansible.builtin.include_tasks: tasks/dvc/bootstrap_dvc.yaml
+      ansible.builtin.include_tasks:
+        file: tasks/dvc/bootstrap_dvc.yaml
+        apply:
+          tags: [data, dvc]
+      tags: [data, dvc]
 
-    - name: Extract logs and reports archive
-      containers.podman.podman_container:
-        image: "{{ docker_images.dvc.image }}"
-        name: dvc
-        rm: true
-        recreate: true
-        detach: false
-        workdir: "{{ bootstrap_repo_dir }}"
-        volumes:
-          - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
-          - "{{ docker_volumes.logs }}:{{ bootstrap_logs_mount }}"
-        command:
-          - sh
-          - -c
-          - "tar -xzf data/logs_and_reports.tar.gz -C {{ workdir }}"
+#    - name: Extract logs and reports archive
+#      containers.podman.podman_container:
+#        image: "{{ docker_images.dvc.image }}"
+#        name: dvc
+#        rm: true
+#        recreate: true
+#        detach: false
+#        workdir: "{{ bootstrap_repo_dir }}"
+#        volumes:
+#          - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
+#          - "{{ docker_volumes.logs }}:{{ bootstrap_logs_mount }}"
+#        command:
+#          - sh
+#          - -c
+#          - "tar -xzf data/logs_and_reports.tar.gz -C {{ workdir }}"
 
-    - name: Restore Postgres databases
-      ansible.builtin.include_tasks: tasks/postgres/bootstrap_postgres.yaml
+    - name: Initialize and restore Postgres databases
+      ansible.builtin.include_tasks:
+        file: tasks/postgres/bootstrap_postgres.yaml
+        apply:
+          tags: [data, postgres]
+      tags: [data, postgres]
 
     - name: Initialize MinIO
-      ansible.builtin.include_tasks: tasks/minio/bootstrap_minio.yaml
+      ansible.builtin.include_tasks:
+        file: tasks/minio/bootstrap_minio.yaml
+        apply:
+          tags: [storage, minio]
+      tags: [storage, minio]
 
     - name: Setup MinIO runtime access
-      ansible.builtin.include_tasks: tasks/minio/bootstrap_runtime_access.yaml
+      ansible.builtin.include_tasks:
+        file: tasks/minio/bootstrap_runtime_access.yaml
+        apply:
+          tags: [storage, minio]
+      when: minio_service_accounts is defined
+      tags: [storage, minio]
+
+- name: Bootstrap secrets management after infrastructure dependencies
+  ansible.builtin.import_playbook: setup_infisical.yaml
+  tags: [security, infisical]

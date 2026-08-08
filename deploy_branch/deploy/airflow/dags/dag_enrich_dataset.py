@@ -5,6 +5,7 @@ from common_task import (
     docker_common_args,
     end_pipeline_task,
     infisical_run_command,
+    security_mounts,
     preprocess_task,
     start_pipeline_task,
 )
@@ -28,6 +29,7 @@ def enrich_task():
         python /src/utils/sync_bucket.py dataset --mode push
     """
     return DockerOperator(
+        mounts=security_mounts(),
         task_id='enrich_dataset',
         image="jbbillaud/rakuten:spacy-v3.8.11",
         command=infisical_run_command(script, identity),

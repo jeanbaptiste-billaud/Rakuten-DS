@@ -1,0 +1,48 @@
+---
+- name: Define Podman Docker Hub login settings
+  ansible.builtin.set_fact:
+    podman_docker_hub_registry: "{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"
+    podman_registry_auth_file: "{{ podman_registry_auth_file | default(ansible_user_dir ~ '/.config/containers/auth.json') }}"
+    podman_docker_hub_credentials_available: >-
+      {{
+        docker_hub is defined
+        and docker_hub.username is defined
+        and docker_hub.username | length > 0
+        and docker_hub.password is defined
+        and docker_hub.password | length > 0
+      }}
+  no_log: true
+
+- name: Validate Docker Hub credentials
+  ansible.builtin.assert:
+    that:
+      - podman_docker_hub_credentials_available | bool
+    fail_msg: >-
+      Docker Hub credentials are required for Podman registry authentication.
+      Define docker_hub.username and docker_hub.password in the Ansible Vault.
+  when: podman_docker_hub_login_required | default(false) | bool
+
+- name: Create containers config directory for Ansible user
+  ansible.builtin.file:
+    path: "{{ podman_registry_auth_file | dirname }}"
+    state: directory
+    mode: "0700"
+  become: false
+  when: podman_docker_hub_credentials_available | bool
+
+- name: Login to Docker Hub with Podman
+  containers.podman.podman_login:
+    registry: "{{ podman_docker_hub_registry }}"
+    username: "{{ docker_hub.username }}"
+    password: "{{ docker_hub.password }}"
+    authfile: "{{ podman_registry_auth_file }}"
+  become: false
+  no_log: true
+  when: podman_docker_hub_credentials_available | bool
+
+- name: Secure Podman registry auth file
+  ansible.builtin.file:
+    path: "{{ podman_registry_auth_file }}"
+    mode: "0600"
+  become: false
+  when: podman_docker_hub_credentials_available | bool

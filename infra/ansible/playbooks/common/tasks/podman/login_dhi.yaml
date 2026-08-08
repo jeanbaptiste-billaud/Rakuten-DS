@@ -1,0 +1,48 @@
+---
+- name: Define Podman DHI login settings
+  ansible.builtin.set_fact:
+    podman_dhi_registry: "{{ podman_dhi_registry | default('dhi.io') }}"
+    podman_registry_auth_file: "{{ podman_registry_auth_file | default(ansible_user_dir ~ '/.config/containers/auth.json') }}"
+    podman_dhi_credentials_available: >-
+      {{
+        docker_hub is defined
+        and docker_hub.username is defined
+        and docker_hub.username | length > 0
+        and docker_hub.password is defined
+        and docker_hub.password | length > 0
+      }}
+  no_log: true
+
+- name: Validate DHI credentials
+  ansible.builtin.assert:
+    that:
+      - podman_dhi_credentials_available | bool
+    fail_msg: >-
+      DHI registry credentials are required for Podman authentication to dhi.io.
+      Define docker_hub.username and docker_hub.password in the Ansible Vault.
+  when: podman_dhi_login_required | default(false) | bool
+
+- name: Create containers config directory for Ansible user
+  ansible.builtin.file:
+    path: "{{ podman_registry_auth_file | dirname }}"
+    state: directory
+    mode: "0700"
+  become: false
+  when: podman_dhi_credentials_available | bool
+
+- name: Login to DHI with Podman
+  containers.podman.podman_login:
+    registry: "{{ podman_dhi_registry }}"
+    username: "{{ docker_hub.username }}"
+    password: "{{ docker_hub.password }}"
+    authfile: "{{ podman_registry_auth_file }}"
+  become: false
+  no_log: true
+  when: podman_dhi_credentials_available | bool
+
+- name: Secure Podman registry auth file
+  ansible.builtin.file:
+    path: "{{ podman_registry_auth_file }}"
+    mode: "0600"
+  become: false
+  when: podman_dhi_credentials_available | bool

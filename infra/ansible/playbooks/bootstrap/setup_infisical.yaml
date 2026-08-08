@@ -12,7 +12,6 @@
           'git rev-parse --show-toplevel'
         )
       }}
-    infisical_install_host_cli: true
     infisical_configure_with_terraform: true
     infisical_cli_command:
       - infisical
@@ -30,17 +29,42 @@
           - project_root_stat.stat.isdir
         fail_msg: "Invalid project_root: {{ project_root }}"
 
-#    - name: Install Terraform CLI
-#      ansible.builtin.include_tasks:
-#        file: "{{ playbook_dir }}/../common/tasks/terraform/install_terraform.yaml"
-#      when: infisical_configure_with_terraform | default(true) | bool
-#
+    - name: Check Terraform CLI
+      ansible.builtin.command:
+        argv:
+          - terraform
+          - version
+      register: setup_infisical_terraform_version
+      changed_when: false
+      failed_when: false
+      when: infisical_configure_with_terraform | default(true) | bool
+
+    - name: Validate Terraform CLI
+      ansible.builtin.assert:
+        that:
+          - setup_infisical_terraform_version.rc == 0
+        fail_msg: >-
+          Terraform CLI is required to configure Infisical with Terraform.
+          Run infra/ansible/playbooks/common/install_local_softwares.yaml first.
+      when: infisical_configure_with_terraform | default(true) | bool
+
+    - name: Check Infisical CLI
+      ansible.builtin.command:
+        argv: "{{ infisical_cli_command + ['--version'] }}"
+      register: setup_infisical_cli_version
+      changed_when: false
+      failed_when: false
+
+    - name: Validate Infisical CLI
+      ansible.builtin.assert:
+        that:
+          - setup_infisical_cli_version.rc == 0
+        fail_msg: >-
+          Infisical CLI is required to bootstrap and seed Infisical.
+          Run infra/ansible/playbooks/common/install_local_softwares.yaml first.
+
     - name: Setup Infisical service
       ansible.builtin.include_tasks: tasks/infisical/setup_infisical.yaml
-#
-#    - name: Install Infisical CLI
-#      ansible.builtin.include_tasks: tasks/infisical/install_infisical_cli.yaml
-#      when: infisical_install_host_cli | bool
 
     - name: Bootstrap and seed Infisical
       ansible.builtin.include_tasks: tasks/infisical/bootstrap_infisical.yaml

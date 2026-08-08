@@ -1,5 +1,5 @@
 ---
-- name: Define MinIO runtime access policies
+- name: Define MinIO policy action sets
   ansible.builtin.set_fact:
     minio_read_actions:
       - s3:GetObject
@@ -9,6 +9,9 @@
       - s3:PutObject
       - s3:DeleteObject
       - s3:ListBucket
+
+- name: Define MinIO runtime access policies
+  ansible.builtin.set_fact:
     minio_runtime_accounts:
       - name: data-ingestion
         access_key: "{{ minio_service_accounts.data_ingestion.access_key }}"

@@ -14,6 +14,7 @@ from common_task import (
     docker_common_args,
     end_pipeline_task,
     infisical_run_command,
+    security_mounts,
     start_pipeline_task,
 )
 
@@ -65,7 +66,7 @@ def training_task():
     return DockerOperator(
         task_id="train_model",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
-        mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        mounts=security_mounts(Mount(source="airflow_vol", target=WORKDIR, type="volume")),
         command=infisical_run_command(script, identity),
         **common_args,
     )
@@ -84,8 +85,10 @@ def build_model_task():
         image="jbbillaud/rakuten:bentoml-v1.4.33",
         user=f"{os.getenv('AIRFLOW_UID', 5000)}:{os.getenv('DOCKER_GID', 1001)}",
         command=infisical_run_command(script, identity),
-        mounts=[Mount(source="/var/run/docker.sock", target="/var/run/docker.sock", type="bind"),
-                Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        mounts=security_mounts(
+            Mount(source="/var/run/docker.sock", target="/var/run/docker.sock", type="bind"),
+            Mount(source="airflow_vol", target=WORKDIR, type="volume"),
+        ),
         **common_args,
     )
 
@@ -133,7 +136,7 @@ def model_comparison_task():
     return DockerOperator(
         task_id="model_comparison",
         image="jbbillaud/rakuten:sklearn-v1.8.0",
-        mounts=[Mount(source="airflow_vol", target=WORKDIR, type="volume")],
+        mounts=security_mounts(Mount(source="airflow_vol", target=WORKDIR, type="volume")),
         command=infisical_run_command("python /src/model_promotion_decision.py", identity),
         do_xcom_push=True,
         **common_args

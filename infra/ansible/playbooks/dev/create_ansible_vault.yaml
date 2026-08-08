@@ -15,7 +15,7 @@
 
     postgres_services:
       - name: root
-        user: postgres
+        user: "{{ vault_postgres_root_user }}"
       - name: admin
         user: postgres_admin
       - name: mlflow
@@ -24,9 +24,6 @@
       - name: airflow
         db: airflow_db
         user: airflow
-      - name: jenkins
-        db: jenkins_db
-        user: jenkins
       - name: infisical
         db: infisical_db
         user: infisical
@@ -38,8 +35,6 @@
         user: mlflow
       - name: airflow
         user: airflow
-      - name: jenkins
-        user: admin
 
     minio_service_account_definitions:
       - name: data_ingestion
@@ -89,6 +84,11 @@
       prompt: "DagsHub password/token (laisser vide si non configuré)"
       private: true
       default: ""
+
+    - name: vault_postgres_root_user
+      prompt: "Identifiant du superutilisateur PostgreSQL"
+      private: false
+      default: postgres
 
     - name: vault_docker_hub_username
       prompt: "Docker Hub username (laisser vide si non configuré)"

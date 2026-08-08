@@ -21,6 +21,7 @@ COPY src/pipeline_steps_df/training /src
 COPY src/pipeline_steps_df/model_promotion_decision.py /src/model_promotion_decision.py
 COPY src/models_module_df /src/models_module_df
 COPY src/utils /src/utils
+COPY src/security /src/security
 
 RUN groupadd -g 1000 trainusr \
  && useradd -u 1000 -g trainusr -m -s /bin/bash trainusr

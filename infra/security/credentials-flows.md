@@ -154,9 +154,9 @@ via `infisical run --path /workloads/...`.
 | `src/pipeline_steps_df/training/train_text_model_with_drift.py` | MLflow + MinIO + drift-detector HTTP | Idem | V2: echoue si Infisical n'injecte pas les variables requises |
 | `src/model_serving/build_step.py` | MLflow + artifacts | `MLFLOW_TRACKING_URI`, probablement S3 credentials selon artifact store | Echoue si `MLFLOW_TRACKING_URI` absent |
 | `src/pipeline_steps_df/model_promotion_decision.py` | MLflow | `MLFLOW_TRACKING_URI`; S3 si artifacts necessaires | Compare runs |
-| `docker/minio-client/minio_backup.sh` | MinIO via `mc` | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | V2: utilise le compte non-root `backup-id` |
-| `docker/minio-client/minio_init.sh` | MinIO via `mc` | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | Bootstrap/admin uniquement |
-| `docker/minio-client/mc-config/config.json*` | MinIO via `mc` | Alias MinIO avec credential en clair | Supprime en V2; la config doit etre regeneree au runtime |
+| `src/minio/minio_backup.py` | SDK Python MinIO | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | V2 shellless : compte `backup-id`, conteneur root dans le namespace Podman rootless pour écrire dans `dvc_data` |
+| `src/minio/minio_init.py` | SDK Python MinIO | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | Bootstrap/admin uniquement ; volume DVC en lecture seule |
+| `docker/minio-client/mc-config/config.json*` | Ancienne CLI `mc` | Alias MinIO avec credential en clair | Legacy V1, non utilisé par les scripts V2 SDK |
 | `deploy_branch/boostrap/init.sh` | GitHub, DagsHub, Postgres | `GITHUB_TOKEN`, `DAGSHUB_USER`, `DAGSHUB_PASSWORD`, `POSTGRES_PASSWORD` | Legacy bash a remplacer par Ansible/Terraform |
 
 ## Problemes V1 Connus

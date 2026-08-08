@@ -4,7 +4,7 @@
     image: "{{ bootstrap_minio_image }}"
     name: minio
     state: started
-    recreate: true
+    recreate: false
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -44,16 +44,15 @@
     detach: false
     network: "{{ docker_network }}"
     volumes:
-      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
-    entrypoint:
-      - /bin/sh
-      - -lc
+      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}:ro"
+    entrypoint: python
     env:
       MINIO_MLFLOW_BUCKET: "{{ minio.MINIO_MLFLOW_BUCKET | default('mlflow-artifacts') }}"
       MINIO_ROOT_USER: "{{ minio.MINIO_ROOT_USER }}"
       MINIO_ROOT_PASSWORD: "{{ minio.MINIO_ROOT_PASSWORD }}"
-      MINIO_HOST: "{{ minio.MINIO_HOST | default('minio') }}"
-      MINIO_PORT: "{{ minio.MINIO_PORT | default('9000') }}"
-    command: |
-      /src/minio_init.sh > /proc/1/fd/1 2>&1
+      MINIO_HOST: minio
+      MINIO_PORT: "9000"
+    command:
+      - -m
+      - src.minio.minio_init
   no_log: true

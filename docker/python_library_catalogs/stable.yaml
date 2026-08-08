@@ -33,6 +33,7 @@ catalog:
     pydantic: ==2.12.5
     requests: ==2.31.0
     scikit-learn: ==1.8.0
+    spiffe: ==0.3.0
     spacy: ==3.8.11
     fr-core-news-sm: ==3.8.0
     streamlit: ==1.29.0
@@ -88,7 +89,8 @@ features:
     - dvc
     - pathspec
   minio-client:
-    pypi: []
+    pypi:
+    - minio
   mlflow:
     pypi:
     - mlflow
@@ -129,6 +131,9 @@ features:
     pypi: []
   reverse-proxy:
     pypi: []
+  security:
+    pypi:
+    - spiffe
 
 environments:
   api-gateway:
@@ -137,18 +142,25 @@ environments:
   - auth-service
   bentoml:
   - bentoml
+  - security
   drift-detector:
   - drift-detector
   dvc:
   - dvc
+  - security
   minio-client:
+  - security
   - minio-client
   mlflow:
   - mlflow
   spacy:
   - spacy
+  - security
   trainer:
   - trainer
+  - security
+  postgres-backup:
+  - security
   streamlit:
   - streamlit
   airflow:
@@ -184,6 +196,9 @@ images:
   spacy:
     dockerfile: spacy/Dockerfile
     pixi-env: spacy
+  postgres-backup:
+    dockerfile: postgres-backup/Dockerfile
+    pixi-env: postgres-backup
   trainer:
     dockerfile: trainer/Dockerfile
     pixi-env: trainer

@@ -1,5 +1,4 @@
 import os
-import shlex
 
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.docker.operators.docker import DockerOperator
@@ -13,6 +12,10 @@ WORKDIR = os.getenv("WORKDIR", "/app")
 INFISICAL_DOMAIN = os.getenv("INFISICAL_DOMAIN", "http://infisical:8080")
 INFISICAL_ENV = os.getenv("INFISICAL_ENV", "dev")
 INFISICAL_PROJECT_ID = os.getenv("INFISICAL_PROJECT_ID", "")
+CONTAINER_NETWORK = os.getenv("CONTAINER_NETWORK", "mlflow-network")
+SPIRE_SOCKET_VOLUME = os.getenv("SPIRE_SOCKET_VOLUME", "spire_agent_socket")
+SPIFFE_ENDPOINT_SOCKET = os.getenv("SPIFFE_ENDPOINT_SOCKET", "unix:///run/spire/sockets/agent.sock")
+SPIFFE_TRUST_DOMAIN = os.getenv("SPIFFE_TRUST_DOMAIN", "rakuten.local")
 
 INFISICAL_SECRET_PATHS = {
     "data-ingestion-id": "/workloads/data-ingestion",
@@ -27,16 +30,12 @@ INFISICAL_SECRET_PATHS = {
 }
 
 
-def _identity_token_env(identity: str) -> str:
-    return f"INFISICAL_{identity.upper().replace('-', '_')}_TOKEN"
+def _identity_id_env(identity: str) -> str:
+    return f"INFISICAL_{identity.upper().replace('-', '_')}_IDENTITY_ID"
 
 
-def _identity_client_id_env(identity: str) -> str:
-    return f"INFISICAL_{identity.upper().replace('-', '_')}_CLIENT_ID"
-
-
-def _identity_client_secret_env(identity: str) -> str:
-    return f"INFISICAL_{identity.upper().replace('-', '_')}_CLIENT_SECRET"
+def _workload_name(identity: str) -> str:
+    return identity.removesuffix("-id")
 
 
 def infisical_runtime_env(identity: str) -> dict[str, str]:
@@ -44,44 +43,26 @@ def infisical_runtime_env(identity: str) -> dict[str, str]:
         "INFISICAL_DOMAIN": INFISICAL_DOMAIN,
         "INFISICAL_ENV": INFISICAL_ENV,
         "INFISICAL_PROJECT_ID": INFISICAL_PROJECT_ID,
-        "INFISICAL_IDENTITY": identity,
+        "INFISICAL_IDENTITY_ID": os.getenv(_identity_id_env(identity), ""),
         "INFISICAL_SECRET_PATH": INFISICAL_SECRET_PATHS[identity],
-        "INFISICAL_CLIENT_ID": os.getenv(_identity_client_id_env(identity), ""),
-        "INFISICAL_CLIENT_SECRET": os.getenv(_identity_client_secret_env(identity), ""),
-        "INFISICAL_TOKEN": os.getenv(_identity_token_env(identity), ""),
+        "SPIFFE_ENDPOINT_SOCKET": SPIFFE_ENDPOINT_SOCKET,
+        "SPIFFE_AUDIENCE": "infisical",
+        "SPIFFE_EXPECTED_ID": f"spiffe://{SPIFFE_TRUST_DOMAIN}/workload/{_workload_name(identity)}",
     }
 
 
 def infisical_run_command(script: str, identity: str):
-    quoted_script = shlex.quote(script)
     return [
-        "sh",
-        "-lc",
-        f"""
-        set -e
-        : "${{INFISICAL_PROJECT_ID:?missing Infisical project id}}"
-        if [ -z "${{INFISICAL_TOKEN:-}}" ]; then
-          : "${{INFISICAL_CLIENT_ID:?missing Infisical client id for {identity}}}"
-          : "${{INFISICAL_CLIENT_SECRET:?missing Infisical client secret for {identity}}}"
-          INFISICAL_TOKEN="$(infisical login \
-            --method universal-auth \
-            --client-id "$INFISICAL_CLIENT_ID" \
-            --client-secret "$INFISICAL_CLIENT_SECRET" \
-            --domain "$INFISICAL_DOMAIN" \
-            --plain \
-            --silent)"
-          export INFISICAL_TOKEN
-        fi
-        exec infisical run \
-          --silent \
-          --domain "$INFISICAL_DOMAIN" \
-          --token "$INFISICAL_TOKEN" \
-          --projectId "$INFISICAL_PROJECT_ID" \
-          --env "$INFISICAL_ENV" \
-          --path "$INFISICAL_SECRET_PATH" \
-          -- sh -lc {quoted_script}
-        """.strip(),
+        "python", "-m", "src.security.secure_runner", "--", "sh", "-lc", script,
     ]
+
+
+def infisical_run_argv(command: list[str], identity: str) -> list[str]:
+    return ["python", "-m", "src.security.secure_runner", "--", *command]
+
+
+def security_mounts(*mounts: Mount) -> list[Mount]:
+    return [*mounts, Mount(source=SPIRE_SOCKET_VOLUME, target="/run/spire/sockets", type="volume", read_only=True)]
 
 
 def docker_common_args(identity: str | None = None, extra_environment: dict[str, str] | None = None):
@@ -102,8 +83,9 @@ def docker_common_args(identity: str | None = None, extra_environment: dict[str,
     return {
         "api_version": "auto",
         "auto_remove": "success",
-        "network_mode": "mlflow-network",
+        "network_mode": CONTAINER_NETWORK,
         "environment": environment,
+        "labels": {"org.rakuten.workload": _workload_name(identity)} if identity else {},
     }
 
 
@@ -141,6 +123,7 @@ def preprocess_task():
     return DockerOperator(
         task_id='preprocessing',
         image='jbbillaud/rakuten:spacy-v3.8.11',
+        mounts=security_mounts(),
         command=infisical_run_command(script, identity),
         doc_md="""
         ### 🐳 Docker task
@@ -200,10 +183,10 @@ def pg_dump_task(db_name: str):
 
     return DockerOperator(
         task_id=f"backup_{db_name}",
-        image="postgres:17",  # contient pg_dump/pg_restore
-        mounts=[
+        image="jbbillaud/rakuten:postgres-backup-latest",
+        mounts=security_mounts(
             Mount(source="dvc_data", target=os.path.join(WORKDIR, "dvc_data"), type="volume"),
-        ],
+        ),
         command=infisical_run_command(script, identity),
         **common_args,
     )

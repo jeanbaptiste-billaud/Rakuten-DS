@@ -23,6 +23,8 @@ COPY src/model_serving /model_serving
 COPY src/data_module_df /model_serving/src/data_module_df
 COPY src/models_module_df /model_serving/src/models_module_df
 COPY src/utils /model_serving/src/utils
+RUN mkdir -p /src && touch /src/__init__.py
+COPY src/security /src/security
 RUN chmod +x /model_serving/model_building.sh
 
 RUN chown -R trainusr:trainusr /model_serving
@@ -44,6 +46,7 @@ ENV PATH="${PIXI_HOME}/bin:/app/.pixi/envs/${PIXI_ENV}/bin:${PATH}"
 
 # Copie des utilitaires
 COPY --from=builder /model_serving /model_serving
+COPY --from=builder /src /src
 
 # Copie des utilisateurs
 COPY --from=builder /etc/passwd /etc/passwd

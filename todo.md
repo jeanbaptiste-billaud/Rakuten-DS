@@ -13,7 +13,7 @@
 
 - airflow:
   - supprimer tache bashoperator dans pipeline entrainement
-  - remplacer par Trigger Jenkins job:
+  - remplacer par un workflow GitHub Actions réutilisable :
     - bento build & container
     - push registry
     - deploy

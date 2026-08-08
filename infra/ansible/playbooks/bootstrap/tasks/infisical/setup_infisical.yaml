@@ -48,7 +48,7 @@
       - --network-alias
       - postgres
       - -v
-      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/data"
+      - "{{ docker_volumes.postgres }}:/var/lib/postgresql/17/data:U"
       - -e
       - POSTGRES_USER={{ postgres.root.user }}
       - -e

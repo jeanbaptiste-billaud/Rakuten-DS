@@ -11,7 +11,7 @@ locals {
   mlflow_endpoint = "http://${var.minio_host}:${var.minio_port}"
 
   images = {
-    postgres        = "postgres:17"
+    postgres        = "dhi.io/postgres:17"
     minio           = "minio/minio:${var.minio_version}"
     mlflow_server   = "jbbillaud/rakuten:mlflow-${var.mlflow_version}"
     drift_detector  = "jbbillaud/rakuten:evidently-v0.7.20"
@@ -26,7 +26,7 @@ locals {
     airflow         = "dhi.io/airflow:3-compat"
   }
 
-  infisical_stack_secrets = data.infisical_secrets.docker_stack.secrets
+  infisical_stack_secrets  = data.infisical_secrets.docker_stack.secrets
   infisical_mlflow_secrets = data.infisical_secrets.mlflow_service.secrets
 
   stack_credentials = {
@@ -72,10 +72,8 @@ locals {
   ]
 
   infisical_identity_env = flatten([
-    for identity, credentials in var.infisical_identity_credentials : [
-      "INFISICAL_${replace(upper(identity), "-", "_")}_ID_CLIENT_ID=${credentials.client_id}",
-      "INFISICAL_${replace(upper(identity), "-", "_")}_ID_CLIENT_SECRET=${credentials.client_secret}"
-    ]
+    for identity, identity_id in var.infisical_identity_ids :
+    "INFISICAL_${replace(upper(identity), "-", "_")}_IDENTITY_ID=${identity_id}"
   ])
 
   airflow_common_env = concat([
@@ -97,6 +95,9 @@ locals {
     "INFISICAL_DOMAIN=${var.infisical_domain}",
     "INFISICAL_ENV=${var.infisical_env}",
     "INFISICAL_PROJECT_ID=${var.infisical_project_id}",
+    "CONTAINER_NETWORK=${local.docker_config.network.name}",
+    "SPIRE_SOCKET_VOLUME=${local.docker_config.volumes.spire_socket}",
+    "SPIFFE_ENDPOINT_SOCKET=unix:///run/spire/sockets/agent.sock",
     "AIRFLOW__METRICS__STATSD_ON=True",
     "AIRFLOW__METRICS__STATSD_HOST=statsd-exporter",
     "AIRFLOW__METRICS__STATSD_PORT=8125",

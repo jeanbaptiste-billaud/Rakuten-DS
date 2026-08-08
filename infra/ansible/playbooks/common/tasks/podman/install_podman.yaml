@@ -42,42 +42,8 @@
     content: |
       unqualified-search-registries = ["{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"]
 
-- name: Create containers config directory for Ansible user
-  ansible.builtin.file:
-    path: "{{ ansible_user_dir }}/.config/containers"
-    state: directory
-    mode: "0700"
-  become: false
-  when:
-    - docker_hub is defined
-    - docker_hub.username is defined
-    - docker_hub.username | length > 0
-    - docker_hub.password is defined
-    - docker_hub.password | length > 0
-
 - name: Login to Docker Hub with Podman
-  containers.podman.podman_login:
-    registry: "{{ podman_default_registry | default(docker_registry | default('docker.io')) }}"
-    username: "{{ docker_hub.username }}"
-    password: "{{ docker_hub.password }}"
-    authfile: "{{ ansible_user_dir }}/.config/containers/auth.json"
-  become: false
-  no_log: true
-  when:
-    - docker_hub is defined
-    - docker_hub.username is defined
-    - docker_hub.username | length > 0
-    - docker_hub.password is defined
-    - docker_hub.password | length > 0
+  ansible.builtin.include_tasks: login_docker_hub.yaml
 
-- name: Secure Podman registry auth file
-  ansible.builtin.file:
-    path: "{{ ansible_user_dir }}/.config/containers/auth.json"
-    mode: "0600"
-  become: false
-  when:
-    - docker_hub is defined
-    - docker_hub.username is defined
-    - docker_hub.username | length > 0
-    - docker_hub.password is defined
-    - docker_hub.password | length > 0
+- name: Login to DHI with Podman
+  ansible.builtin.include_tasks: login_dhi.yaml

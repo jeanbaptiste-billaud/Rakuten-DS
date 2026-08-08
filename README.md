@@ -241,7 +241,7 @@ docker compose exec minio-client mc ls myminio/dataset
 docker compose exec minio-client mc ls myminio/mlflow
 
 # Backup des buckets MinIO vers local
-docker compose exec minio-client sh /src/minio_backup.sh
+docker compose exec minio-client python -m src.minio.minio_backup
 
 # Lister les expériences MLflow (via conteneur)
 docker compose exec mlflow-server mlflow experiments list

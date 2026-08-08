@@ -20,6 +20,7 @@ RUN mkdir -p /src && touch /src/__init__.py
 COPY src/data_module_df /src/data_module_df
 COPY src/pipeline_steps_df/data /src
 COPY src/utils /src/utils
+COPY src/security /src/security
 
 RUN groupadd -g 1000 trainusr \
  && useradd -u 1000 -g trainusr -m -s /bin/bash trainusr

@@ -1,7 +1,7 @@
 ---
 - name: Check if DVC repo exists
   ansible.builtin.stat:
-    path: "{{ bootstrap_repo_dir }}/.git"
+    path: "{{ volume_mountpoints.dvc }}/.git"
   register: dvc_repo
 
 - name: Clone DVC repository
@@ -38,24 +38,41 @@
         dvc remote modify origin --local password "{{ dagshub.password }}"
   no_log: true
 
+- name: Inspect DVC branch tracking list
+  ansible.builtin.stat:
+    path: "{{ volume_mountpoints.dvc }}/.dvc/dvc_tracking_list.yaml"
+  register: dvc_branch_tracking_list
+
+- name: Inspect controller fallback tracking list
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/../../../../.dvc/dvc_tracking_list.yaml"
+  register: dvc_fallback_tracking_list
+
+- name: Require a DVC tracking list
+  ansible.builtin.assert:
+    that:
+      - dvc_branch_tracking_list.stat.exists or dvc_fallback_tracking_list.stat.exists
+    fail_msg: >-
+      dvc_tracking_list.yaml is absent from both the cloned DVC branch and the
+      Ansible controller repository.
+
+- name: Select DVC tracking list source
+  ansible.builtin.set_fact:
+    dvc_tracking_list_file: >-
+      {{ volume_mountpoints.dvc ~ '/.dvc/dvc_tracking_list.yaml'
+         if dvc_branch_tracking_list.stat.exists
+         else playbook_dir ~ '/../../../../.dvc/dvc_tracking_list.yaml' }}
+
+- name: Report DVC tracking list fallback
+  ansible.builtin.debug:
+    msg: >-
+      The cloned {{ repo_branch }} branch does not contain dvc_tracking_list.yaml;
+      using the controller repository copy for this bootstrap run.
+  when: not dvc_branch_tracking_list.stat.exists
+
 - name: Load DVC tracking list
   ansible.builtin.include_vars:
-    file: "{{ volume_mountpoints.dvc }}/.dvc/dvc_tracking_list.yaml"
-
-- name: Normalize DVC tracking list
-  containers.podman.podman_container:
-    image: "{{ docker_images.dvc.image }}"
-    name: dvc
-    rm: true
-    recreate: true
-    detach: false
-    workdir: "{{ bootstrap_repo_dir }}"
-    volumes:
-      - "{{ docker_volumes.dvc }}:{{ bootstrap_repo_dir }}"
-    command:
-      - sh
-      - -c
-      - "sed -i 's/\\r$//' .dvc/dvc_tracking_list.yaml"
+    file: "{{ dvc_tracking_list_file }}"
 
 - name: Pull DVC tracked data
   containers.podman.podman_container:
