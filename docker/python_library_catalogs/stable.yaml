@@ -31,7 +31,7 @@ catalog:
     plotly: ==5.18.0
     prometheus-client: ==0.24.1
     pydantic: ==2.12.5
-    requests: ==2.31.0
+    requests: ==2.34.2
     scikit-learn: ==1.8.0
     spiffe: ==0.3.0
     spacy: ==3.8.11

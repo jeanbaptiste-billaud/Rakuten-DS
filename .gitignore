@@ -18,3 +18,8 @@ terraform-output.json
 infisical-bootstrap.json
 infisical-bootstrap.log
 runtime.env
+
+# fichiers générés par pixi
+/docker/python_library_catalogs/.cache/
+/docker/python_library_catalogs/pixi.lock
+/docker/python_library_catalogs/pixi.toml
