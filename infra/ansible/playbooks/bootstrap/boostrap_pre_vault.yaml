@@ -12,42 +12,45 @@
     ansible_vault_password_file: "{{ ansible_vault_password_dir }}/.vault_pass"
 
   tasks:
-  - name: Ensure Ansible vault password directory exists
-    ansible.builtin.file:
-      path: "{{ ansible_vault_password_dir }}"
-      state: directory
-      mode: "0700"
+    - name: Ensure Ansible vault password directory exists
+      ansible.builtin.file:
+        path: "{{ ansible_vault_password_dir }}"
+        state: directory
+        mode: "0700"
 
-  - name: Write executable Ansible vault password helper
-    ansible.builtin.copy:
-      dest: "{{ ansible_vault_password_file }}"
-      mode: "0700"
-      content: |
-        #!/usr/bin/env bash
-        set -euo pipefail
+    - name: Write executable Ansible vault password helper
+      ansible.builtin.copy:
+        dest: "{{ ansible_vault_password_file }}"
+        mode: "0700"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
 
-        : "${BW_PASSWORD:?BW_PASSWORD is required}"
-        session="$(bw unlock --passwordenv BW_PASSWORD --raw)"
-        trap 'bw lock >/dev/null 2>&1 || true' EXIT
-        bw get password ANSIBLE_VAULT_PASSWORD --session "$session"
-    no_log: true
+          : "${BW_PASSWORD:?BW_PASSWORD is required}"
+          session="$(bw unlock --passwordenv BW_PASSWORD --raw)"
+          trap 'bw lock >/dev/null 2>&1 || true' EXIT
+          bw get password ANSIBLE_VAULT_PASSWORD --session "$session"
+      no_log: true
 
-  - name: Launch restore playbook with Ansible Vault password
-    ansible.builtin.command:
-      argv:
-        - ansible-playbook
-        - -i
-        - infra/ansible/inventory/hosts.ini
-        - infra/ansible/playbooks/bootstrap_restore.yaml
-        - --vault-password-file
-        - "{{ ansible_vault_password_file }}"
-    environment:
-      BW_PASSWORD: "{{ bitwarden_master_password }}"
-    no_log: false
-
-  - name: Lock Bitwarden vault
-    ansible.builtin.command:
-      cmd: bw lock
-    failed_when: false
-    changed_when: false
-    no_log: true
+    - name: Bootstrap infrastructure with Ansible Vault password
+      block:
+        - name: Run bootstrap playbook
+          ansible.builtin.command:
+            argv:
+              - ansible-playbook
+              - -i
+              - "{{ playbook_dir }}/../../inventory/hosts.ini"
+              - "{{ playbook_dir }}/bootstrap.yaml"
+              - --vault-password-file
+              - "{{ ansible_vault_password_file }}"
+            chdir: "{{ playbook_dir }}/../../../.."
+          environment:
+            BW_PASSWORD: "{{ bitwarden_master_password }}"
+          no_log: true
+      always:
+        - name: Lock Bitwarden vault
+          ansible.builtin.command:
+            cmd: bw lock
+          failed_when: false
+          changed_when: false
+          no_log: true

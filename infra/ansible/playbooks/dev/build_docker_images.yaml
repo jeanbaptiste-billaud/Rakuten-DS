@@ -1,4 +1,4 @@
-- name: setup env and build docker images
+- name: Setup env and build Docker images
   hosts: dev
   gather_facts: true
 

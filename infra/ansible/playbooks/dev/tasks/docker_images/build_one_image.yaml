@@ -3,7 +3,7 @@
 - name: Prepare image build config
   ansible.builtin.include_tasks: tasks/docker_images/prepare_build_image.yaml
 
-- name: Build docker image {{ build_image.repository }}:{{ build_image.tag }}
+- name: Build Docker image
   containers.podman.podman_image:
     name: "{{ build_image.repository }}"
     tag: "{{ build_image.tag }}"
@@ -11,8 +11,8 @@
     build:
       file: "{{ build_image.dockerfile_path }}"
       force_rm: true
-      extra_args : >-
-        --build-arg PIXI_ENV="{{ build_image.name }}" 
+      extra_args: >-
+        --build-arg PIXI_ENV="{{ build_image.name }}"
         --build-arg PIXI_CATALOG_DIR="{{ catalog_dir_from_context }}"
         --build-arg DVC_VOLUME_DIR="{{ docker_volumes.dvc }}"
         --build-arg POSTGRES_VOLUME_DIR="{{ docker_volumes.postgres }}"

@@ -5,7 +5,7 @@ source "$(git rev-parse --show-toplevel)/scripts/lib/project_paths.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
-ANSIBLE_CONFIG_FILE="${PROJECT_ROOT}/ansible.cfg"
+ANSIBLE_CONFIG_FILE="${PROJECT_ROOT}/ansible-ci.cfg"
 
 export PROJECT_ROOT
 export ANSIBLE_CONFIG="${ANSIBLE_CONFIG_FILE}"
@@ -57,12 +57,4 @@ run_playbook \
 
 run_playbook \
   infra/ansible/playbooks/bootstrap/boostrap_pre_vault.yaml \
-  --limit deploy
-
-run_playbook \
-  infra/ansible/playbooks/bootstrap/bootstrap.yaml \
-  --limit deploy
-
-run_playbook \
-  infra/ansible/playbooks/bootstrap/setup_infisical.yaml \
   --limit deploy

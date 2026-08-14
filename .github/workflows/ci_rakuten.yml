@@ -178,12 +178,25 @@ jobs:
       - name: Install Ansible
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ansible-core
+          python -m pip install ansible-core==2.20.7 ansible-lint==26.6.0
           ansible-galaxy collection install -r infra/ansible/requirements.yaml
 
-      - name: Validate playbook syntax
+      - name: Validate Ansible playbooks
+        env:
+          ANSIBLE_CONFIG: ansible-ci.cfg
         run: |
-          ansible-playbook             -i infra/ansible/inventory/hosts.ini             infra/ansible/playbooks/dev/build_docker_images.yaml             --syntax-check
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventory/hosts.ini \
+            infra/ansible/playbooks/dev/build_docker_images.yaml \
+            --syntax-check
+          ansible-playbook \
+            -i infra/ansible/inventory/hosts.ini \
+            infra/ansible/playbooks/bootstrap/boostrap_pre_vault.yaml \
+            --syntax-check
+          ansible-lint \
+            infra/ansible/playbooks/dev/build_docker_images.yaml \
+            infra/ansible/playbooks/bootstrap/boostrap_pre_vault.yaml
 
   catalog:
     name: Pixi catalog validation

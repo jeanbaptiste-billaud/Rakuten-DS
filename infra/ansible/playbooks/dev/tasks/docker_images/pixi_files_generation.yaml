@@ -1,16 +1,19 @@
-#infra/ansible/playbooks/tasks/docker_images/pixi_files_generation.yaml
+# infra/ansible/playbooks/tasks/docker_images/pixi_files_generation.yaml
 ---
-- stat:
+- name: Check catalog YAML
+  ansible.builtin.stat:
     path: "{{ catalog_yaml }}"
     checksum_algorithm: sha256
   register: yaml_info
 
-- stat:
+- name: Check catalog TOML
+  ansible.builtin.stat:
     path: "{{ catalog_toml }}"
     checksum_algorithm: sha256
   register: toml_info
 
-- stat:
+- name: Check catalog lock file
+  ansible.builtin.stat:
     path: "{{ catalog_lock }}"
     checksum_algorithm: sha256
   register: lock_info
@@ -29,6 +32,7 @@
     not toml_info.stat.exists or
     yaml_info.stat.mtime > toml_info.stat.mtime
   register: toml_generation
+  changed_when: true
 
 - name: Generate pixi.lock file
   containers.podman.podman_container:
@@ -39,7 +43,7 @@
     detach: false
     workdir: /workspace
     volumes:
-    - "{{ catalog_dir }}:/workspace:Z"
+      - "{{ catalog_dir }}:/workspace:Z"
     user: "{{ ansible_facts.user_uid }}:{{ ansible_facts.user_gid }}"
     userns: keep-id
     command: pixi lock
