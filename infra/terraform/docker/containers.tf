@@ -1,8 +1,8 @@
 module "core" {
   source = "./modules/core"
 
-  image_ids                = { for name, image in docker_image.images : name => image.image_id }
-  volume_names             = merge(
+  image_ids = { for name, image in docker_image.images : name => image.image_id }
+  volume_names = merge(
     { for name, volume in docker_volume.volumes : name => volume.name },
     { logs_and_reports = docker_volume.volumes["logs"].name }
   )
@@ -39,8 +39,8 @@ module "monitoring" {
 module "frontend" {
   source = "./modules/frontend"
 
-  image_ids     = { for name, image in docker_image.images : name => image.image_id }
-  volume_names  = merge(
+  image_ids = { for name, image in docker_image.images : name => image.image_id }
+  volume_names = merge(
     { for name, volume in docker_volume.volumes : name => volume.name },
     { logs_and_reports = docker_volume.volumes["logs"].name }
   )

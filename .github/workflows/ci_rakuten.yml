@@ -1,81 +1,316 @@
-name: Rakuten CI
+name: Infrastructure CI
 
 on:
   workflow_dispatch:
+    inputs:
+      full_run:
+        description: Run every infrastructure check
+        required: true
+        type: boolean
+        default: true
   push:
-    branches:
-      - infra
-      - text_classif
-      - images_classif
-      - dev
-      - main
+    branches: [infra]
   pull_request:
-    branches:
-      - dev
-      - main
+    branches: [dev]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: infra-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  python-tests:
-    name: Python checks
+  changes:
+    name: Detect affected infrastructure areas
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      PYTHONPATH: .
+    outputs:
+      terraform: ${{ steps.detect.outputs.terraform }}
+      ansible: ${{ steps.detect.outputs.ansible }}
+      catalog: ${{ steps.detect.outputs.catalog }}
+      services: ${{ steps.detect.outputs.services }}
+      images: ${{ steps.detect.outputs.images }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Detect changed paths and previous failures
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FULL_RUN: ${{ inputs.full_run || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          terraform=false
+          ansible=false
+          catalog=false
+          services=false
+          images=false
+
+          enable_all() {
+            terraform=true
+            ansible=true
+            catalog=true
+            services=true
+            images=true
+          }
+
+          if [[ "$FULL_RUN" == "true" ]]; then
+            enable_all
+          else
+            base_sha="$BASE_SHA"
+            if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+              base_sha="$(git rev-parse "$HEAD_SHA^" 2>/dev/null || git rev-list --max-parents=0 "$HEAD_SHA")"
+            fi
+
+            git diff --name-only "$base_sha...$HEAD_SHA" > "${{ runner.temp }}/changed-files.txt"
+            cat "${{ runner.temp }}/changed-files.txt"
+
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/ci_rakuten.yml)
+                  enable_all
+                  ;;
+                infra/terraform/*)
+                  terraform=true
+                  ;;
+                infra/ansible/playbooks/dev/*|infra/ansible/playbooks/common/tasks/podman/*)
+                  ansible=true
+                  images=true
+                  ;;
+                infra/ansible/*)
+                  ansible=true
+                  ;;
+                docker/python_library_catalogs/*|src/deps/generate_pixi_toml.py)
+                  catalog=true
+                  images=true
+                  ;;
+                docker/api-gateway/*|docker/drift-detector/*|src/security/*|src/tests/api_gateway/*|src/tests/drift_detector/*|src/tests/security/*)
+                  services=true
+                  images=true
+                  ;;
+                docker/*)
+                  images=true
+                  ;;
+              esac
+            done < "${{ runner.temp }}/changed-files.txt"
+          fi
+
+          previous_run_id="$(
+            gh api --method GET "repos/${{ github.repository }}/actions/workflows/ci_rakuten.yml/runs" -f branch="$HEAD_BRANCH" -f status=completed -f per_page=1 --jq '.workflow_runs[0].id // empty'
+          )"
+
+          if [[ -n "$previous_run_id" ]]; then
+            failed_jobs="$(
+              gh api --method GET "repos/${{ github.repository }}/actions/runs/$previous_run_id/jobs" -f filter=latest -f per_page=100 --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
+            )"
+
+            while IFS= read -r job_name; do
+              case "$job_name" in
+                "Detect affected infrastructure areas"|"Infrastructure CI gate")
+                  enable_all
+                  ;;
+                "Terraform validation")
+                  terraform=true
+                  ;;
+                "Ansible validation")
+                  ansible=true
+                  ;;
+                "Pixi catalog validation")
+                  catalog=true
+                  ;;
+                "Infrastructure service contracts")
+                  services=true
+                  ;;
+                "Build and smoke-test infrastructure images")
+                  images=true
+                  ;;
+              esac
+            done <<< "$failed_jobs"
+          fi
+
+          {
+            echo "terraform=$terraform"
+            echo "ansible=$ansible"
+            echo "catalog=$catalog"
+            echo "services=$services"
+            echo "images=$images"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  terraform:
+    name: Terraform validation
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Format and validate Terraform
+        run: |
+          set -euo pipefail
+          terraform fmt -check -recursive infra/terraform
+          for module in infra/terraform/docker infra/terraform/infisical; do
+            terraform -chdir="$module" init -backend=false -input=false
+            terraform -chdir="$module" validate
+          done
+
+  ansible:
+    name: Ansible validation
+    needs: changes
+    if: needs.changes.outputs.ansible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install test dependencies
-        shell: bash
+      - name: Install Ansible
         run: |
-          set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install pytest pytest-cov
-          if [[ -f src/tests/requirements.txt ]]; then
-            python -m pip install -r src/tests/requirements.txt
-          fi
+          python -m pip install ansible-core
+          ansible-galaxy collection install -r infra/ansible/requirements.yaml
 
-      - name: Check Python syntax
-        shell: bash
+      - name: Validate playbook syntax
         run: |
-          set -euo pipefail
-          paths=()
-          [[ -d src ]] && paths+=(src)
-          [[ -d rakuten_vision ]] && paths+=(rakuten_vision)
-          if (( ${#paths[@]} )); then
-            python -m compileall -q "${paths[@]}"
-          fi
+          ansible-playbook             -i infra/ansible/inventory/hosts.ini             infra/ansible/playbooks/dev/build_docker_images.yaml             --syntax-check
 
-      - name: Run unit tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -n "$(find src/tests -type f -name 'test_*.py' -print -quit 2>/dev/null)" ]]; then
-            pytest src/tests/ \
-              --ignore=src/tests/services/mlflow_writing_test.py \
-              --doctest-modules \
-              --junitxml=junit/test-results.xml
-          else
-            echo "No pytest suite found on this branch; syntax checks completed."
-          fi
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v4
+  catalog:
+    name: Pixi catalog validation
+    needs: changes
+    if: needs.changes.outputs.catalog == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          name: pytest-results-${{ github.run_id }}
-          path: junit/test-results.xml
-          if-no-files-found: ignore
-          retention-days: 14
+          python-version: "3.12"
+
+      - name: Verify generated Pixi manifest
+        run: |
+          python -m pip install PyYAML
+          python src/deps/generate_pixi_toml.py             --input docker/python_library_catalogs/stable.yaml             --output "${{ runner.temp }}/pixi.toml"             --python "3.12.*"
+          diff -u             <(sed 's/\r$//' docker/python_library_catalogs/pixi.toml)             "${{ runner.temp }}/pixi.toml"
+
+  services:
+    name: Infrastructure service contracts
+    needs: changes
+    if: needs.changes.outputs.services == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+      WORKDIR: /tmp/rakuten-drift-ci
+      MINIO_ACCESS_KEY: ci-access-key
+      MINIO_SECRET_KEY: ci-secret-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install service test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install             pytest pytest-mock pytest-asyncio             fastapi httpx pandas evidently             minio prometheus-client spiffe
+
+      - name: Test infrastructure-facing services
+        run: |
+          pytest -q             src/tests/api_gateway             src/tests/drift_detector             src/tests/security
+
+  images:
+    name: Build and smoke-test infrastructure images
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      INFISICAL_CLI_IMAGE: docker.io/infisical/cli:0.43.100
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman curl
+
+      - name: Authenticate to DHI
+        env:
+          DHI_USERNAME: ${{ secrets.DHI_USERNAME }}
+          DHI_TOKEN: ${{ secrets.DHI_TOKEN }}
+        run: |
+          test -n "$DHI_USERNAME"
+          test -n "$DHI_TOKEN"
+          printf '%s' "$DHI_TOKEN" | podman login dhi.io --username "$DHI_USERNAME" --password-stdin
+
+      - name: Build Pixi builder
+        run: |
+          podman build             --file docker/pixi/Dockerfile             --tag docker.io/jbbillaud/rakuten:pixi-latest             .
+
+      - name: Build MLflow and Drift Detector
+        run: |
+          for service in mlflow drift-detector; do
+            podman build               --file "docker/$service/Dockerfile"               --build-arg "PIXI_ENV=$service"               --build-arg "PIXI_CATALOG_DIR=docker/python_library_catalogs"               --build-arg "INFISICAL_CLI_IMAGE=$INFISICAL_CLI_IMAGE"               --tag "localhost/rakuten-$service:ci"               .
+          done
+
+      - name: Smoke-test service health
+        run: |
+          podman network create rakuten-ci
+          podman run -d --name mlflow-ci --network rakuten-ci -p 5000:5000 localhost/rakuten-mlflow:ci
+          podman run -d --name drift-ci --network rakuten-ci -p 8003:8003 localhost/rakuten-drift-detector:ci
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:5000/health >/dev/null && break
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:5000/health
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8003/health >/dev/null && break
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8003/health
+
+      - name: Show container logs
+        if: failure()
+        run: |
+          podman logs mlflow-ci || true
+          podman logs drift-ci || true
+
+      - name: Clean up containers
+        if: always()
+        run: |
+          podman rm -f mlflow-ci drift-ci 2>/dev/null || true
+          podman network rm -f rakuten-ci 2>/dev/null || true
+
+  gate:
+    name: Infrastructure CI gate
+    if: always()
+    needs: [changes, terraform, ansible, catalog, services, images]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify selected jobs
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TERRAFORM_RESULT: ${{ needs.terraform.result }}
+          ANSIBLE_RESULT: ${{ needs.ansible.result }}
+          CATALOG_RESULT: ${{ needs.catalog.result }}
+          SERVICES_RESULT: ${{ needs.services.result }}
+          IMAGES_RESULT: ${{ needs.images.result }}
+        run: |
+          set -euo pipefail
+          for result in             "$CHANGES_RESULT"             "$TERRAFORM_RESULT"             "$ANSIBLE_RESULT"             "$CATALOG_RESULT"             "$SERVICES_RESULT"             "$IMAGES_RESULT"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "A required infrastructure check ended with: $result"; exit 1 ;;
+            esac
+          done
