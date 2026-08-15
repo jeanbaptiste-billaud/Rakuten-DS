@@ -221,7 +221,7 @@ jobs:
             --output "${{ runner.temp }}/pixi.toml" \
             --python "3.12.*"
 
-      - name: Validate generated Pixi manifest
+      - name: Validate generated Pixi manifest and lock resolution
         run: |
           set -euo pipefail
 
@@ -236,8 +236,7 @@ jobs:
             --python "3.12.*"
 
           pixi lock \
-            --manifest-path "${{ runner.temp }}/pixi.toml" \
-            --dry-run
+            --manifest-path "${{ runner.temp }}/pixi.toml"
 
   services:
     name: Infrastructure service contracts
@@ -329,11 +328,13 @@ jobs:
       - name: Build MLflow and Drift Detector
         run: |
           for service in mlflow drift-detector; do
-            podman build --file "docker/$service/Dockerfile" \
-          --build-arg "PIXI_ENV=$service" \
-          --build-arg "PIXI_CATALOG_DIR=docker/python_library_catalogs"\
-          --build-arg "INFISICAL_CLI_IMAGE=$INFISICAL_CLI_IMAGE"       
-          --tag "localhost/rakuten-$service:ci"               .
+            podman build \
+              --file "docker/$service/Dockerfile" \
+              --build-arg "PIXI_ENV=$service" \
+              --build-arg "PIXI_CATALOG_DIR=docker/python_library_catalogs" \
+              --build-arg "INFISICAL_CLI_IMAGE=$INFISICAL_CLI_IMAGE" \
+              --tag "localhost/rakuten-$service:ci" \
+              .
           done
 
       - name: Smoke-test service health
