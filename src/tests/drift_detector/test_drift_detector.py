@@ -1,36 +1,56 @@
-import sys
 import os
-import json
+import sys
+import importlib.util
+import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
-# Add docker/drift-detector to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../../"))
-drift_path = os.path.join(project_root, "docker/drift-detector")
-sys.path.append(drift_path)
+service_path = os.path.join(project_root, "docker/drift-detector/service.py")
 
-# Mock Evidently and Path.mkdir before importing service to avoid heavy loading and permission errors
-with patch.dict(sys.modules, {"evidently": MagicMock(), "evidently.presets": MagicMock()}):
-    with patch("pathlib.Path.mkdir"): # Prevent /app creation attempt
-        from service import app
+# Le conteneur utilise /app par défaut, mais ce chemin n'est pas inscriptible
+# quand le test est lancé directement sur la machine de développement.
+os.environ.setdefault("WORKDIR", tempfile.mkdtemp(prefix="rakuten-drift-test-"))
 
-# We need to re-patch commonly used objects inside service because of the import
-from service import EvaluationData
+service_spec = importlib.util.spec_from_file_location(
+    "drift_detector_service",
+    service_path,
+)
+if service_spec is None or service_spec.loader is None:
+    raise ImportError(f"Impossible de charger le service depuis {service_path}")
+
+service = importlib.util.module_from_spec(service_spec)
+sys.modules[service_spec.name] = service
+service_spec.loader.exec_module(service)
+
+app = service.app
+EvaluationData = service.EvaluationData
 
 client = TestClient(app)
 
 @pytest.fixture
 def mock_filesystem(tmp_path):
     """Mock STORAGE_DIR to use tmp_path."""
-    with patch("service.STORAGE_DIR", tmp_path), \
-         patch("service.REFERENCE_PATH", tmp_path / "reference_data.csv"), \
-         patch("service.HISTORY_PATH", tmp_path / "metrics_history.json"):
+    with patch.dict(service.__dict__, {
+        "STORAGE_DIR": tmp_path,
+        "REFERENCE_PATH": tmp_path / "reference_data.csv",
+        "HISTORY_PATH": tmp_path / "metrics_history.json",
+    }):
         yield tmp_path
 
-@patch("service.generate_drift_report")
-def test_log_evaluation_first_run(mock_gen_report, mock_filesystem):
+@pytest.fixture
+def mock_generate_drift_report():
+    mock_gen_report = MagicMock(return_value="/tmp/report.html")
+    with patch.dict(service.__dict__, {
+        "generate_drift_report": mock_gen_report,
+    }):
+        yield mock_gen_report
+
+
+def test_log_evaluation_first_run(mock_filesystem):
     """Test that first run creates baseline and does not detect drift."""
     
     payload = {
@@ -51,16 +71,16 @@ def test_log_evaluation_first_run(mock_gen_report, mock_filesystem):
     # Check that reference file was created
     assert (mock_filesystem / "reference_data.csv").exists()
 
-@patch("service.generate_drift_report")
-def test_log_evaluation_subsequent_run_no_drift(mock_gen_report, mock_filesystem):
+def test_log_evaluation_subsequent_run_no_drift(
+    mock_filesystem,
+    mock_generate_drift_report,
+):
     """Test subsequent run without drift."""
     # 1. Create baseline
     ref_path = mock_filesystem / "reference_data.csv"
     import pandas as pd
     pd.DataFrame({"target": [1], "prediction": [1], "run_id": "run_0"}).to_csv(ref_path, index=False)
     
-    mock_gen_report.return_value = "/tmp/report.html"
-
     payload = {
         "run_id": "run_2",
         "timestamp": "2023-01-02T12:00:00",
@@ -76,15 +96,12 @@ def test_log_evaluation_subsequent_run_no_drift(mock_gen_report, mock_filesystem
     assert data["drift_detected"] is False
     assert data["accuracy_drop"] == 0.0
 
-@patch("service.generate_drift_report")
-def test_log_evaluation_with_drift(mock_gen_report, mock_filesystem):
+def test_log_evaluation_with_drift(mock_filesystem, mock_generate_drift_report):
     """Test subsequent run WITH drift."""
     # 1. Baseline has 100% accuracy
     ref_path = mock_filesystem / "reference_data.csv"
     import pandas as pd
     pd.DataFrame({"target": [1, 0], "prediction": [1, 0], "run_id": "run_0"}).to_csv(ref_path, index=False)
-
-    mock_gen_report.return_value = "/tmp/report.html"
 
     # 2. Current run has 0% accuracy
     payload = {

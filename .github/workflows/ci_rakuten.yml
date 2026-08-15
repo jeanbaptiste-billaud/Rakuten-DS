@@ -210,11 +210,34 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify generated Pixi manifest
+      - name: Validate Pixi catalog generation
         run: |
+          set -euo pipefail
+
           python -m pip install PyYAML
-          python src/deps/generate_pixi_toml.py             --input docker/python_library_catalogs/stable.yaml             --output "${{ runner.temp }}/pixi.toml"             --python "3.12.*"
-          diff -u             <(sed 's/\r$//' docker/python_library_catalogs/pixi.toml)             "${{ runner.temp }}/pixi.toml"
+
+          python src/deps/generate_pixi_toml.py \
+            --input docker/python_library_catalogs/stable.yaml \
+            --output "${{ runner.temp }}/pixi.toml" \
+            --python "3.12.*"
+
+      - name: Validate generated Pixi manifest
+        run: |
+          set -euo pipefail
+
+          python -m pip install PyYAML
+
+          wget -qO- https://pixi.sh/install.sh | sh
+          export PATH="$HOME/.pixi/bin:$PATH"
+
+          python src/deps/generate_pixi_toml.py \
+            --input docker/python_library_catalogs/stable.yaml \
+            --output "${{ runner.temp }}/pixi.toml" \
+            --python "3.12.*"
+
+          pixi lock \
+            --manifest-path "${{ runner.temp }}/pixi.toml" \
+            --dry-run
 
   services:
     name: Infrastructure service contracts
@@ -223,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PYTHONPATH: .
+      PYTHONPATH: ${{ github.workspace }}/src
       WORKDIR: /tmp/rakuten-drift-ci
       MINIO_ACCESS_KEY: ci-access-key
       MINIO_SECRET_KEY: ci-secret-key
@@ -233,14 +256,29 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install service test dependencies
+      - name: Install Pixi test environment
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install             pytest pytest-mock pytest-asyncio             fastapi httpx pandas evidently             minio prometheus-client spiffe
+          set -euo pipefail
+          python -m pip install PyYAML
+          wget -qO- https://pixi.sh/install.sh | sh
+          echo "$HOME/.pixi/bin" >> "$GITHUB_PATH"
+          python src/deps/generate_pixi_toml.py \
+            --input docker/python_library_catalogs/stable.yaml \
+            --output "${{ runner.temp }}/pixi.toml" \
+            --python "3.12.*"
+          "$HOME/.pixi/bin/pixi" lock \
+            --manifest-path "${{ runner.temp }}/pixi.toml"
+          "$HOME/.pixi/bin/pixi" install \
+            --manifest-path "${{ runner.temp }}/pixi.toml" \
+            --locked \
+            --environment test-infra
 
       - name: Test infrastructure-facing services
         run: |
-          pytest -q             src/tests/api_gateway             src/tests/drift_detector             src/tests/security
+          pixi run \
+            --manifest-path "${{ runner.temp }}/pixi.toml" \
+            --environment test-infra \
+            pytest -q src/tests/api_gateway src/tests/drift_detector src/tests/security
 
   images:
     name: Build and smoke-test infrastructure images
@@ -252,6 +290,10 @@ jobs:
       INFISICAL_CLI_IMAGE: docker.io/infisical/cli:0.43.100
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install Podman
         run: |
@@ -267,14 +309,31 @@ jobs:
           test -n "$DHI_TOKEN"
           printf '%s' "$DHI_TOKEN" | podman login dhi.io --username "$DHI_USERNAME" --password-stdin
 
+      - name: Generate Pixi manifest and lock file
+        run: |
+          set -euo pipefail
+          python -m pip install PyYAML
+          wget -qO- https://pixi.sh/install.sh | sh
+          export PATH="$HOME/.pixi/bin:$PATH"
+          python src/deps/generate_pixi_toml.py \
+            --input docker/python_library_catalogs/stable.yaml \
+            --output docker/python_library_catalogs/pixi.toml \
+            --python "3.12.*"
+          pixi lock \
+            --manifest-path docker/python_library_catalogs/pixi.toml
+
       - name: Build Pixi builder
         run: |
-          podman build             --file docker/pixi/Dockerfile             --tag docker.io/jbbillaud/rakuten:pixi-latest             .
+          podman build --file docker/pixi/Dockerfile --tag docker.io/jbbillaud/rakuten:pixi-latest             .
 
       - name: Build MLflow and Drift Detector
         run: |
           for service in mlflow drift-detector; do
-            podman build               --file "docker/$service/Dockerfile"               --build-arg "PIXI_ENV=$service"               --build-arg "PIXI_CATALOG_DIR=docker/python_library_catalogs"               --build-arg "INFISICAL_CLI_IMAGE=$INFISICAL_CLI_IMAGE"               --tag "localhost/rakuten-$service:ci"               .
+            podman build --file "docker/$service/Dockerfile" \
+          --build-arg "PIXI_ENV=$service" \
+          --build-arg "PIXI_CATALOG_DIR=docker/python_library_catalogs"\
+          --build-arg "INFISICAL_CLI_IMAGE=$INFISICAL_CLI_IMAGE"       
+          --tag "localhost/rakuten-$service:ci"               .
           done
 
       - name: Smoke-test service health

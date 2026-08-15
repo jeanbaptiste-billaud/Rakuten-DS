@@ -46,6 +46,8 @@
             chdir: "{{ playbook_dir }}/../../../.."
           environment:
             BW_PASSWORD: "{{ bitwarden_master_password }}"
+          register: bootstrap_result
+          changed_when: bootstrap_result.stdout is regex('changed=[1-9]')
           no_log: true
       always:
         - name: Lock Bitwarden vault
