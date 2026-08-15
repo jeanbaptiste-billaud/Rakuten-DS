@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 
 import bentoml
+
 import mlflow
 from mlflow.tracking import MlflowClient
-
 from src.utils.common_utils import get_project_root
 
 
@@ -21,17 +21,17 @@ def resolve_run_id(workdir: str) -> str:
     - priorité à MLFLOW_RUN_ID
     - fallback sur run_id.json dans le volume Airflow
     """
-    run_id = os.getenv("MLFLOW_RUN_ID")
-    if run_id:
-        return run_id
+    resolved_run_id = os.getenv("MLFLOW_RUN_ID")
+    if resolved_run_id:
+        return resolved_run_id
 
     run_id_path = os.path.join(workdir, "training_exports", "run_id.json")
-    with open(run_id_path, "r") as f:
-        meta = json.load(f)
+    with open(run_id_path, "r") as metadata_file:
+        meta = json.load(metadata_file)
 
-    run_id = meta["run_id"]
-    os.environ["MLFLOW_RUN_ID"] = run_id
-    return run_id
+    resolved_run_id = meta["run_id"]
+    os.environ["MLFLOW_RUN_ID"] = resolved_run_id
+    return resolved_run_id
 
 
 def get_model_uri_from_run(run_id: str) -> tuple[str, str]:
@@ -44,10 +44,10 @@ def get_model_uri_from_run(run_id: str) -> tuple[str, str]:
     if not run.outputs or not run.outputs.model_outputs:
         raise RuntimeError(f"Aucun model_output trouvé pour le run {run_id}")
 
-    model_id = run.outputs.model_outputs[0].model_id
-    model_uri = f"models:/{model_id}"
+    resolved_model_id = run.outputs.model_outputs[0].model_id
+    resolved_model_uri = f"models:/{resolved_model_id}"
 
-    return model_uri, model_id
+    return resolved_model_uri, resolved_model_id
 
 
 # ---------------------------------------------------------------------
@@ -65,29 +65,29 @@ if not mlflow_uri:
 mlflow.set_tracking_uri(mlflow_uri)
 
 # Résolution du run_id
-run_id = resolve_run_id(workdir)
+resolved_run_id = resolve_run_id(workdir)
 
 # Récupération du modèle MLflow
-model_uri, model_id = get_model_uri_from_run(run_id)
+resolved_model_uri, resolved_model_id = get_model_uri_from_run(resolved_run_id)
 
 # Récupération des métriques de performance du modèle
-mlflow.artifacts.download_artifacts(run_id=run_id,
+mlflow.artifacts.download_artifacts(run_id=resolved_run_id,
                                     artifact_path="eval/metrics_text.json",
                                     dst_path="/model_serving")
 
 # Exports ENV (⚠️ NE PAS SUPPRIMER)
-os.environ["MODEL_URI"] = model_uri
+os.environ["MODEL_URI"] = resolved_model_uri
 
 env_exports = {
-    "MLFLOW_RUN_ID": run_id,
-    "MODEL_URI": model_uri,
+    "MLFLOW_RUN_ID": resolved_run_id,
+    "MODEL_URI": resolved_model_uri,
 }
 
 # ---------------------------------------------------------------------
 # Chargement du modèle depuis MLflow
 # ---------------------------------------------------------------------
 
-loaded = mlflow.sklearn.load_model(model_uri)
+loaded = mlflow.sklearn.load_model(resolved_model_uri)
 
 # Cas où MLflow renvoie un wrapper
 model = loaded.model if hasattr(loaded, "model") else loaded
@@ -101,9 +101,9 @@ bento_model = bentoml.sklearn.save_model(
     model=model,
     signatures={"predict": {"batchable": True}, },
     metadata={
-        "mlflow.model_uri": model_uri,
-        "mlflow.model_id": model_id,
-        "mlflow.run_id": run_id,
+        "mlflow.model_uri": resolved_model_uri,
+        "mlflow.model_id": resolved_model_id,
+        "mlflow.run_id": resolved_run_id,
     },
 )
 
@@ -112,7 +112,7 @@ bento_model = bentoml.sklearn.save_model(
 # ---------------------------------------------------------------------
 
 Path("bento_model_tag.txt").write_text(str(bento_model.tag))
-Path("mlflow_run_id.txt").write_text(run_id)
+Path("mlflow_run_id.txt").write_text(resolved_run_id)
 
 with open(".env", "w") as f:
     for key, val in env_exports.items():

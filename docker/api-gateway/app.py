@@ -1,13 +1,13 @@
-import os
 import logging
-import httpx
+import os
 import time
-
-from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
+from typing import Dict, Optional
+
+import httpx
 from fastapi import FastAPI, HTTPException, Response
-from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from pydantic import BaseModel, Field
 
 AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://airflow-apiserver:8080")
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
@@ -47,8 +47,9 @@ class PredictResponse(BaseModel):
     probabilities: Dict[int, float]
 
 
+# noinspection PyInconsistentReturns
 @app.post("/predict", response_model=PredictResponse)
-async def predict(request: PredictRequest):
+async def predict(request: PredictRequest) -> PredictResponse:
     endpoint, method = "/predict", "POST"
     API_REQUEST_COUNT.labels(endpoint, method).inc()
 
@@ -68,7 +69,7 @@ async def predict(request: PredictRequest):
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     # Le model-serving de ton repo expose /metrics (pas /health) -> on ping /metrics
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
@@ -113,8 +114,9 @@ async def get_airflow_token() -> str:
     return _airflow_token
 
 
+# noinspection PyInconsistentReturns
 @app.post("/pipelines/{pipeline_name}")
-async def trigger_pipeline(pipeline_name: str):
+async def trigger_pipeline(pipeline_name: str) -> dict[str, str]:
     endpoint, method = f"/pipelines/{pipeline_name}", "POST"
     API_REQUEST_COUNT.labels(endpoint, method).inc()
 

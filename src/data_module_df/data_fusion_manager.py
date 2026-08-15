@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 
+# noinspection PyClassHasNoInit
 class FusionManager:
     @staticmethod
     def fuse_predictions(text_probs, image_probs, strategy='mean'):

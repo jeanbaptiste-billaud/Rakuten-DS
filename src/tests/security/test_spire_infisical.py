@@ -4,7 +4,6 @@ from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-
 from src.security.config import SecurityConfigurationError, SecuritySettings
 from src.security.spire_infisical import (
     SecurityBootstrapError,
@@ -27,6 +26,7 @@ def settings() -> SecuritySettings:
     )
 
 
+# noinspection PyClassHasNoInit
 class JwtSvid:
     token = "jwt-svid-value"
     spiffe_id = "spiffe://rakuten.local/workload/training"
@@ -42,7 +42,8 @@ class WorkloadClient:
     def __exit__(self, *_args):
         return None
 
-    def fetch_jwt_svid(self, **kwargs):
+    @staticmethod
+    def fetch_jwt_svid(**kwargs):
         assert kwargs["audience"] == {"infisical"}
         return JwtSvid()
 

@@ -2,14 +2,13 @@ import os
 import textwrap
 from datetime import datetime
 
-import requests
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import BranchPythonOperator
 from airflow.sdk import timezone, dag, task, task_group
-from docker.types import Mount
 
+import requests
 from common_task import (
     docker_common_args,
     end_pipeline_task,
@@ -17,6 +16,7 @@ from common_task import (
     security_mounts,
     start_pipeline_task,
 )
+from docker.types import Mount
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
@@ -163,6 +163,7 @@ def build_new_model_task_gp():
         trigger_rule="none_failed_min_one_success"
     )
 
+    # noinspection PyStatementEffect
     [keep_current_model, stop_model >> build >> start_model] >> end
 
 
@@ -205,6 +206,7 @@ def training_pipeline_dag():
     end = end_pipeline_task()
 
     # Orchestration
+    # noinspection PyStatementEffect
     start >> data_lineage >> training >> get_run_id >> model_comparison >> branch >> model_promotion >> end
 
 

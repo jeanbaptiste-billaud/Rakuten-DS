@@ -1,9 +1,9 @@
-import json
 import hashlib
+import json
 import os
 
 
-def check_token(token: str, required_role: str = "user", config_path=None):
+def check_token(token_value: str, required_role: str = "user", config_path=None):
     """
     Vérifie le token par rapport au fichier JSON et au rôle requis.
     """
@@ -19,7 +19,7 @@ def check_token(token: str, required_role: str = "user", config_path=None):
         config = json.load(f)
 
     # Hash du token fourni par l’utilisateur
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    token_hash = hashlib.sha256(token_value.encode()).hexdigest()
 
     # Recherche du rôle correspondant
     role = None

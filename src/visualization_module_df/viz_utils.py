@@ -1,10 +1,10 @@
 # viz_utils.py
 import os
+
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import numpy as np
-import pandas as pd
 
 
 def plot_confusion_matrix(y_true, y_pred, labels=None, title='Confusion Matrix', save_path=None):
@@ -31,7 +31,7 @@ def plot_prediction_distribution(proba_df, model_name, save_dir='../data/plots')
     plt.close()
 
 
-def analyze_prediction_errors(pipeline, y_pred, y_true):
+def analyze_prediction_errors(_pipeline, y_pred, y_true):
     erreurs = []
     for i, (yp, yt) in enumerate(zip(y_pred, y_true)):
         if yp != yt:

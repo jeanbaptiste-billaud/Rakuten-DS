@@ -2,12 +2,10 @@
 
 import json
 import os
-import mlflow
 
+import mlflow
 import pandas as pd
 from sklearn.model_selection import train_test_split
-
-from src.utils.common_utils import get_project_root
 from src.models_module_df.model_text_classifier import TextClassifier
 
 # --- Configuration ---

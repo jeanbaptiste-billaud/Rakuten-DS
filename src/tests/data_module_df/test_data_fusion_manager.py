@@ -1,11 +1,11 @@
-import pytest
 import numpy as np
-import pandas as pd
 import numpy.testing as npt
+import pandas as pd
 import pandas.testing as pdt
-
+import pytest
 # Importer la classe à tester
 from src.data_module_df.data_fusion_manager import FusionManager
+
 
 # --- Fixtures pour les probabilités ---
 
@@ -49,10 +49,6 @@ def test_fuse_strategy_product(prob_fixtures):
     text_p, image_p = prob_fixtures
     
     # Calcul attendu : (A * B) / sum(A * B)
-    fused = np.array([
-        [0.8 * 0.1, 0.1 * 0.2, 0.1 * 0.7], # [0.08, 0.02, 0.07]
-        [0.1 * 0.1, 0.9 * 0.4, 0.0 * 0.5]  # [0.01, 0.36, 0.00]
-    ])
     # Normalisation (chaque ligne doit sommer à 1)
     fused_sum_0 = 0.08 + 0.02 + 0.07 # 0.17
     fused_sum_1 = 0.01 + 0.36 + 0.00 # 0.37

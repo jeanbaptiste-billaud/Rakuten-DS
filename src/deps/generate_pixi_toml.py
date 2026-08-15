@@ -33,7 +33,6 @@ features:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -149,15 +148,15 @@ def generate_pixi_toml(
         # Fallback: one environment per feature.
         environments = {name: [name] for name in features}
 
-    lines: list[str] = []
-    lines.append("# Generated file. Do not edit manually.")
-    lines.append("# Source of truth: dependencies YAML catalog.")
-    lines.append("")
-
-    lines.append("[workspace]")
-    lines.append(f"channels = {toml_list(channels)}")
-    lines.append(f"platforms = {toml_list(platforms)}")
-    lines.append("")
+    lines: list[str] = [
+        "# Generated file. Do not edit manually.",
+        "# Source of truth: dependencies YAML catalog.",
+        "",
+        "[workspace]",
+        f"channels = {toml_list(channels)}",
+        f"platforms = {toml_list(platforms)}",
+        "",
+    ]
 
     # Optional global Python dependency for all generated environments.
     # If you need per-feature Python versions, put python in catalog.conda and feature.<name>.conda.

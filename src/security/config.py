@@ -30,6 +30,7 @@ def _positive_float(environment: Mapping[str, str], name: str, default: float) -
     return value
 
 
+# noinspection PyClassHasNoInit
 @dataclass(frozen=True)
 class SecuritySettings:
     """Public metadata needed to authenticate a workload and fetch its secrets."""

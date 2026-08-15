@@ -1,11 +1,10 @@
-import pytest
 import numpy as np
 import numpy.testing as npt
+import pytest
 from sklearn.pipeline import Pipeline
-import joblib
-
 # Importer la classe à tester
 from src.models_module_df.model_text_classifier import TextClassifier
+
 
 # --- Fixture 1: Données minimales ---
 
@@ -104,7 +103,7 @@ def test_evaluate_logic():
     # Vérifier le calcul de la confiance moyenne
     assert scores['mean_confidence'] == 0.7800
 
-def test_save_and_load_roundtrip(trained_classifier, sample_data, tmp_path):
+def test_save_and_load_roundtrip(trained_classifier, tmp_path):
     """
     Test 4: Teste un "aller-retour" (round-trip).
     1. Entraîne un modèle.

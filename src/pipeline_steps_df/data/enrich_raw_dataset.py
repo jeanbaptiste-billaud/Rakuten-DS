@@ -1,9 +1,8 @@
 # enrich_raw_dataset.py
 import os
-import pandas as pd
 
+import pandas as pd
 from src.data_module_df.enrich_logic import select_new_samples, enrich_dataset
-from src.utils.common_utils import get_project_root
 
 WORKDIR = os.getenv("WORKDIR", "/workspace")
 

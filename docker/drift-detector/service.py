@@ -3,22 +3,21 @@ Service de détection de drift avec Evidently.
 Monitore les performances du modèle au fil des réentraînements.
 """
 
-import os
-import httpx
 import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
+import httpx
 import pandas as pd
+from evidently import DataDefinition, Dataset, MulticlassClassification, Report
+from evidently.presets import ClassificationPreset
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-
-from evidently import DataDefinition, Dataset, MulticlassClassification, Report
-from evidently.presets import ClassificationPreset
 
 # Configuration logging
 logging.basicConfig(
@@ -268,7 +267,7 @@ def detect_performance_drift(
     # Calculer la dégradation
     reference_accuracy = (reference_df['target'] == reference_df['prediction']).mean()
     current_accuracy = eval_data.metrics['accuracy']
-    accuracy_drop = reference_accuracy - current_accuracy
+    accuracy_drop: float = reference_accuracy - current_accuracy
     
     drift_detected = accuracy_drop > threshold
     
@@ -324,14 +323,13 @@ async def root():
         try:
             dt = datetime.fromisoformat(timestamp)
             date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
+        except ValueError:
             date_str = timestamp
         
         # Récupérer les infos de drift
         accuracy = entry.get('current_accuracy', metrics.get('accuracy', 0.0))
         drift_detected = entry.get('drift_detected', False)
         accuracy_drop = entry.get('accuracy_drop', 0.0)
-        reference_accuracy = entry.get('reference_accuracy', accuracy)
         
         # Affichage du drift
         if drift_detected:

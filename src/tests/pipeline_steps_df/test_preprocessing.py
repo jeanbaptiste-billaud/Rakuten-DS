@@ -1,7 +1,6 @@
+import numpy as np
 import pandas as pd
 import pytest
-import numpy as np
-
 from src.pipeline_steps_df.data import preprocessing
 
 
@@ -42,25 +41,23 @@ def test_preprocessing_main_orchestration(mocker, fake_raw_df, fake_preprocessed
     """
     
     # 1. CONFIGURATION DES MOCKS
-    mock_get_root = mocker.patch("src.pipeline_steps_df.preprocessing.get_project_root")
-    mock_get_root.return_value = "/fake/root"
+    mocker.patch.object(preprocessing, "WORKDIR", "/fake/root")
     
-    mock_makedirs = mocker.patch("os.makedirs")
+    mocker.patch("os.makedirs")
     
     mock_read_csv = mocker.patch("pandas.read_csv")
     mock_read_csv.return_value = fake_raw_df.copy()
     
     # Simuler la logique métier importée
-    mock_preprocess_df = mocker.patch("src.pipeline_steps_df.preprocessing.preprocess_dataframe")
+    mock_preprocess_df = mocker.patch.object(preprocessing, "preprocess_dataframe")
     # Elle retourne notre fixture corrigée
     mock_preprocess_df.return_value = fake_preprocessed_df 
     
     mock_to_csv = mocker.patch("pandas.DataFrame.to_csv")
-    mock_save_distrib = mocker.patch("src.pipeline_steps_df.preprocessing.save_class_distribution")
+    mock_save_distrib = mocker.patch.object(preprocessing, "save_class_distribution")
 
     # Définir les chemins attendus
     expected_raw_path = "/fake/root/data/dataset/raw_dataset.csv"
-    expected_output_dir = "/fake/root/data/preprocessed"
     expected_processed_path = "/fake/root/data/preprocessed/preprocessed_text.csv"
     expected_distrib_path = "/fake/root/data/preprocessed/class_distribution.json"
 

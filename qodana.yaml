@@ -23,8 +23,10 @@ profile:
 #    paths:
 #      - <path/where/not/run/inspection>
 
-#Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-#bootstrap: sh ./prepare-qodana.sh
+# Execute shell command before Qodana execution.
+# Keep Qodana's parser aligned with the repository's Python 3.12 target.
+bootstrap: |
+  conda create --yes --name qodana-env python=3.12
 
 #Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 #plugins:

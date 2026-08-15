@@ -63,6 +63,7 @@ def create_dataset_dag():
     # 🔗 ORCHESTRATION
     # =========================================================================
 
+    # noinspection PyStatementEffect
     start >> dataset >> preprocess >> end
 
 dag = create_dataset_dag()

@@ -1,7 +1,8 @@
 import os
 
-from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.providers.standard.operators.bash import BashOperator
+
 from docker.types import Mount
 
 # =============================================================================
@@ -51,13 +52,13 @@ def infisical_runtime_env(identity: str) -> dict[str, str]:
     }
 
 
-def infisical_run_command(script: str, identity: str):
+def infisical_run_command(script: str, _identity: str):
     return [
         "python", "-m", "src.security.secure_runner", "--", "sh", "-lc", script,
     ]
 
 
-def infisical_run_argv(command: list[str], identity: str) -> list[str]:
+def infisical_run_argv(command: list[str], _identity: str) -> list[str]:
     return ["python", "-m", "src.security.secure_runner", "--", *command]
 
 

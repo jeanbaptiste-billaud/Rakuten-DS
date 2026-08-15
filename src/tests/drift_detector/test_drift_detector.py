@@ -1,6 +1,6 @@
+import importlib.util
 import os
 import sys
-import importlib.util
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -41,7 +41,7 @@ def mock_filesystem(tmp_path):
     }):
         yield tmp_path
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_generate_drift_report():
     mock_gen_report = MagicMock(return_value="/tmp/report.html")
     with patch.dict(service.__dict__, {
@@ -73,7 +73,6 @@ def test_log_evaluation_first_run(mock_filesystem):
 
 def test_log_evaluation_subsequent_run_no_drift(
     mock_filesystem,
-    mock_generate_drift_report,
 ):
     """Test subsequent run without drift."""
     # 1. Create baseline
@@ -96,7 +95,7 @@ def test_log_evaluation_subsequent_run_no_drift(
     assert data["drift_detected"] is False
     assert data["accuracy_drop"] == 0.0
 
-def test_log_evaluation_with_drift(mock_filesystem, mock_generate_drift_report):
+def test_log_evaluation_with_drift(mock_filesystem):
     """Test subsequent run WITH drift."""
     # 1. Baseline has 100% accuracy
     ref_path = mock_filesystem / "reference_data.csv"

@@ -3,7 +3,6 @@ from datetime import datetime
 
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sdk import timezone, dag
-from docker.types import Mount
 
 from common_task import (
     docker_common_args,
@@ -15,6 +14,7 @@ from common_task import (
     start_pipeline_task,
     volume_backup_task,
 )
+from docker.types import Mount
 
 # =============================================================================
 # 🛠️ DÉFINITION DES TASK
@@ -129,6 +129,7 @@ def backup_pipeline_dag():
     # 🔗 ORCHESTRATION
     # =========================================================================
 
+    # noinspection PyStatementEffect
     start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db >> commit >> end
     # start >> [backup_minio_volume, backup_logs_and_reports] >> backup_mlflow_db >> backup_airflow_db
 

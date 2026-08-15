@@ -1,9 +1,9 @@
 # preprocessing.py
 import os
-import pandas as pd
 
-from src.utils.common_utils import get_project_root
+import pandas as pd
 from src.data_module_df.data_text import preprocess_dataframe, save_class_distribution
+
 WORKDIR = os.getenv("WORKDIR", "/workspace")
 def main():
     data_dir = os.path.join(WORKDIR, "data")

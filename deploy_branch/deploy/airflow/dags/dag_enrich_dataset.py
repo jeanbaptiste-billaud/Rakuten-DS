@@ -1,5 +1,5 @@
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.sdk import dag, timezone, task
+from airflow.sdk import dag, timezone
 
 from common_task import (
     docker_common_args,
@@ -69,6 +69,7 @@ def enrich_dataset_dag():
     # 🔗 ORCHESTRATION
     # =========================================================================
 
+    # noinspection PyStatementEffect
     start >> enrich >> preprocess >> end
 
 dag = enrich_dataset_dag()

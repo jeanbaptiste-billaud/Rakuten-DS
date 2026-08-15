@@ -1,8 +1,10 @@
-import streamlit as st
-from pathlib import Path
-import requests
 import json
 import re
+from pathlib import Path
+
+import streamlit as st
+
+import requests
 
 
 def parse_texts(raw: str) -> list[str]:
@@ -119,7 +121,7 @@ for name, (url, col) in services.items():
             col.success(f"✅ {name}")
         else:
             col.error(f"❌ {name}")
-    except:
+    except requests.RequestException:
         col.warning(f"⚠️ {name}")
 
 st.markdown("---")
@@ -208,11 +210,13 @@ texts = parse_texts(raw_text)  # <- toujours une liste[str]
 st.caption("Payload envoyé à l'API")
 st.json({"text": texts})
 
-def call_predict(url: str, token: str, texts: list[str]) -> requests.Response:
+def call_predict(endpoint_url: str, token: str, texts_sent: list[str]) -> requests.Response:
     headers = {"token": token, "Content-Type": "application/json"}
-    return requests.post(url, json={"text": texts}, headers=headers, timeout=30)
+    return requests.post(endpoint_url, json={"text": texts_sent}, headers=headers, timeout=30)
 
-def show_request_and_response(token_used: str, texts_sent: list[str], r: requests.Response):
+def show_request_and_response(
+    token_used: str, texts_sent: list[str], response: requests.Response
+):
     st.subheader("📨 Requête envoyée")
 
     payload_str = json.dumps({"text": texts_sent}, ensure_ascii=False)
@@ -225,32 +229,32 @@ def show_request_and_response(token_used: str, texts_sent: list[str], r: request
     st.code(curl_cmd, language="bash")
 
     st.subheader("📬 Réponse API")
-    if r.status_code == 200:
-        st.success(f"✅ HTTP {r.status_code} (token={token_used})")
+    if response.status_code == 200:
+        st.success(f"✅ HTTP {response.status_code} (token={token_used})")
     else:
-        st.warning(f"⚠️ HTTP {r.status_code} (token={token_used})")
+        st.warning(f"⚠️ HTTP {response.status_code} (token={token_used})")
 
     # Body
     try:
-        st.json(r.json())
+        st.json(response.json())
     except Exception:
-        st.code(r.text, language="text")
+        st.code(response.text, language="text")
 
 col_ok, col_ko = st.columns(2)
 
 with col_ok:
     if st.button("🚀 Predict (token = 456)", type="primary", use_container_width=True):
         try:
-            r = call_predict(api_url, "456", texts)
-            show_request_and_response("456", texts, r)
+            response = call_predict(api_url, "456", texts)
+            show_request_and_response("456", texts, response)
         except Exception as e:
             st.error(f"Erreur réseau / connexion : {e}")
 
 with col_ko:
     if st.button("🔒 Predict (token = 100)", use_container_width=True):
         try:
-            r = call_predict(api_url, "100", texts)
-            show_request_and_response("100", texts, r)
+            response = call_predict(api_url, "100", texts)
+            show_request_and_response("100", texts, response)
         except Exception as e:
             st.error(f"Erreur réseau / connexion : {e}")
 

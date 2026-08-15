@@ -1,7 +1,6 @@
 import logging
-import spacy
-from pydantic import BaseModel, Field
 
+import spacy
 from fastapi import FastAPI, HTTPException, Response
 from prometheus_client import (
     Counter,
@@ -9,6 +8,7 @@ from prometheus_client import (
     generate_latest,
     CONTENT_TYPE_LATEST,
 )
+from pydantic import BaseModel, Field
 
 # ----------------------------------------------------
 # LOGGING
@@ -65,6 +65,7 @@ class PreprocessResponse(BaseModel):
     token_count: int = Field(..., description="Nombre de tokens après nettoyage")
 
 
+# noinspection PyInconsistentReturns
 def preprocess_text(text: str) -> str:
     """
     Nettoie et lemmatise une chaîne de texte.
@@ -116,8 +117,9 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+# noinspection PyInconsistentReturns
 @app.post("/preprocess", response_model=PreprocessResponse)
-async def preprocess(request: PreprocessRequest):
+async def preprocess(request: PreprocessRequest) -> PreprocessResponse:
     """
     Prétraite un texte brut.
     

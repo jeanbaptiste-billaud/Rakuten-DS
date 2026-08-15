@@ -25,6 +25,12 @@ class PipelineConfig:
         self.train_image = self.yaml_cfg["image_model"].get('image_force_training', False)
         self.train_text = self.yaml_cfg["text_model"].get('text_force_training', False)
 
+        # Chemins calculés par process_paths(). Ils sont déclarés ici afin que
+        # l'instance ait un contrat d'attributs explicite dès sa construction.
+        self.processed_dir: Path
+        self.image_model_path: Path
+        self.text_model_path: Path
+
         # 5. Process tous les chemins
         self.process_paths()
         self.image_dir = self.raw_dir / "images"

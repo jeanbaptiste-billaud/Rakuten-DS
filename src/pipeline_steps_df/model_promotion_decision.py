@@ -5,8 +5,6 @@ from typing import Dict, Any
 from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
-from src.utils.common_utils import get_project_root
-
 
 # ------------------------------------------------------------------
 # Helper MLflow

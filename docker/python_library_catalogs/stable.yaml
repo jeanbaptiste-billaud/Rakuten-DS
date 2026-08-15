@@ -47,7 +47,7 @@ catalog:
     fr-core-news-sm: ==3.8.0
     streamlit: ==1.29.0
     streamlit-option-menu: ==0.3.6
-    tqdm: ==4.67.3
+    tqdm: ==4.70.0
     uvicorn:
       version: ==0.40.0
       extras:
@@ -160,7 +160,6 @@ features:
     pypi:
     - pytest
     - pytest-mock
-    - numpy
     - pandas
     - scikit-learn
     - omegaconf
@@ -170,7 +169,6 @@ features:
     - pytest
     - pytest-asyncio
     - pytest-mock
-    - numpy
     - pandas
     - scikit-learn
     - joblib
@@ -180,6 +178,7 @@ features:
     - matplotlib
     - seaborn
     - spacy
+    - fr-core-news-sm
     - tqdm
     - mlflow
     - requests
